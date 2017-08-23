@@ -451,15 +451,16 @@ ObjectConstPtr WorldCollisionModelImpl::convertOctomapToObject(
     boost::shared_ptr<const octomap::OcTree> ot(tree);
 
     // wrap with a shape
-    shapes::ShapeConstPtr sp = boost::make_shared<shapes::OcTree>(ot);
+    //shapes::ShapeConstPtr sp = boost::make_shared<shapes::OcTree>(ot);
 
     Eigen::Affine3d transform;
     tf::poseMsgToEigen(octomap.origin, transform);
 
     // construct the object
-    auto o = boost::make_shared<Object>(octomap.octomap.id);
-    o->shapes_.push_back(sp);
-    o->shape_poses_.push_back(transform);
+    auto o = std::make_shared<const Object>(octomap.octomap.id);
+
+    /*o->shapes_.push_back(sp);
+    o->shape_poses_.push_back(transform);*/
 
     return o;
 }

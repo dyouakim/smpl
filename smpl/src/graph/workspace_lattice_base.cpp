@@ -91,7 +91,7 @@ bool WorkspaceLatticeBase::init(const Params& _params)
     m_res[2] = _params.res_z;
     // TODO: limit these ranges and handle discretization appropriately
     m_res[3] = 2.0 * M_PI / _params.R_count;
-    m_res[4] = M_PI       / _params.P_count;
+    m_res[4] = 2.0 * M_PI / _params.P_count;
     m_res[5] = 2.0 * M_PI / _params.Y_count;
 
     for (int i = 0; i < m_fangle_indices.size(); ++i) {

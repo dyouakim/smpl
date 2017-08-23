@@ -52,7 +52,7 @@ ManipLatticeActionSpace::ManipLatticeActionSpace(ManipLattice* pspace) :
     m_mprim_enabled(),
     m_mprim_thresh(),
     m_use_multiple_ik_solutions(false),
-    m_use_long_and_short_dist_mprims(false)
+    m_use_long_and_short_dist_mprims(true)
 {
     // NOTE: other default thresholds will be set in readParameters, with
     // default values specified in PlanningParams
