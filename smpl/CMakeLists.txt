@@ -84,6 +84,7 @@ add_library(
     src/heuristic/multi_frame_bfs_heuristic.cpp
     src/ros/adaptive_workspace_lattice_allocator.cpp
     src/ros/araplanner_allocator.cpp
+    src/ros/traplanner_allocator.cpp
     src/ros/bfs_heuristic_allocator.cpp
     src/ros/dijkstra_egraph_3d_heuristic_allocator.cpp
     src/ros/experience_graph_planner_allocator.cpp
@@ -101,7 +102,8 @@ add_library(
     src/ros/workspace_lattice_allocator.cpp
     src/search/arastar.cpp
     src/search/experience_graph_planner.cpp
-    src/search/adaptive_planner.cpp)
+    src/search/adaptive_planner.cpp
+    src/search/traplanner.cpp)
 
 target_link_libraries(smpl ${catkin_LIBRARIES} ${sbpl_LIBRARIES})
 
