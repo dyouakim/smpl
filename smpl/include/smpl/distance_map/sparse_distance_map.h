@@ -52,6 +52,31 @@ class SparseDistanceMap : public DistanceMapInterface
 {
 public:
 
+    struct Cell
+    {
+        int ox;
+        int oy;
+        int oz;
+
+        int dist;
+        int dist_new;
+#if SMPL_DMAP_RETURN_CHANGED_CELLS
+        int dist_old;
+#endif
+        Cell* obs;
+        int bucket;
+        int dir;
+
+        int pos;
+
+        // NOTE: vacuous true here for interoperability with SparseGrid::prune.
+        // This shouldn't be used to do unconditional pruning, but should be
+        // used in conjunction with conditional pruning to remove cells with
+        // unknown nearest obstacles, and which must not be referred to by any
+        // other cell as its nearest obstacle.
+        bool operator==(const Cell& rhs) const { return true; }
+    };
+
     SparseDistanceMap(
         double origin_x, double origin_y, double origin_z,
         double size_x, double size_y, double size_z,
@@ -100,32 +125,12 @@ public:
     bool isCellValid(int x, int y, int z) const override;
     ///@}
 
+    double resolution() const { return 1.0 / m_inv_res; }
+    auto cells() -> SparseGrid<Cell>& { return m_cells; }
+
 public:
 
-    struct Cell
-    {
-        int ox;
-        int oy;
-        int oz;
-
-        int dist;
-        int dist_new;
-#if SMPL_DMAP_RETURN_CHANGED_CELLS
-        int dist_old;
-#endif
-        Cell* obs;
-        int bucket;
-        int dir;
-
-        int pos;
-
-        // NOTE: vacuous true here for interoperability with SparseGrid::prune.
-        // This shouldn't be used to do unconditional pruning, but should be
-        // used in conjunction with conditional pruning to remove cells with
-        // unknown nearest obstacles, and which must not be referred to by any
-        // other cell as its nearest obstacle.
-        bool operator==(const Cell& rhs) const { return true; }
-    };
+    static constexpr int NO_UPDATE_DIR = dirnum(0, 0, 0);
 
     SparseGrid<Cell> m_cells;
 
@@ -142,8 +147,6 @@ public:
     int m_dmax_sqrd_int;
 
     int m_bucket;
-
-    int m_no_update_dir;
 
     // Direction offsets to each of the 27 neighbors, including (0, 0, 0).
     // Indexed by a call to dirnum(x, y, z, 0);
@@ -176,7 +179,7 @@ public:
         int y;
         int z;
 
-        bucket_element() { }
+        bucket_element() = default;
         bucket_element(Cell* c, int x, int y, int z) :
             c(c), x(x), y(y), z(z)
         { }
@@ -186,7 +189,15 @@ public:
     typedef std::vector<bucket_type> bucket_list;
     bucket_list m_open;
 
-    std::vector<bucket_element> m_rem_stack;
+    struct GridCoord {
+        int x;
+        int y;
+        int z;
+
+        GridCoord() = default;
+        GridCoord(int x, int y, int z) : x(x), y(y), z(z) { }
+    };
+    std::vector<GridCoord> m_rem_stack;
 
     double m_error;
 

@@ -46,6 +46,7 @@
 #include <leatherman/viz.h>
 #include <moveit_msgs/RobotState.h>
 #include <smpl/angles.h>
+#include <smpl/debug/marker_conversions.h>
 
 namespace sbpl {
 namespace collision {
@@ -404,6 +405,21 @@ CollisionSpace::getCollisionRobotVisualization(
     return markers;
 }
 
+visualization_msgs::MarkerArray
+CollisionSpace::getCollisionRobotVisualization(const double* vals)
+{
+    updateState(vals);
+    // update the spheres within the group
+    for (int ssidx : m_rcs->groupSpheresStateIndices(m_gidx)) {
+        m_rcs->updateSphereStates(ssidx);
+    }
+    auto markers = m_rcs->getVisualization(m_gidx);
+    for (auto& m : markers.markers) {
+        m.header.frame_id = m_grid->getReferenceFrame();
+    }
+    return markers;
+}
+
 /// \brief Return a visualization of the collision details for the current state
 visualization_msgs::MarkerArray
 CollisionSpace::getCollisionDetailsVisualization() const
@@ -421,23 +437,28 @@ CollisionSpace::getCollisionDetailsVisualization(
     return visualization_msgs::MarkerArray();
 }
 
-/// \brief Return a visualization of the bounding box
 visualization_msgs::MarkerArray
-CollisionSpace::getBoundingBoxVisualization() const
+CollisionSpace::getCollisionDetailsVisualization(
+    const double* vals)
+{
+    // TODO: implement me
+    return visualization_msgs::MarkerArray();
+}
+
+/// \brief Return a visualization of the bounding box
+auto CollisionSpace::getBoundingBoxVisualization() const -> visual::Marker
 {
     return m_grid->getBoundingBoxVisualization();
 }
 
 /// \brief Return a visualization of the distance field
-visualization_msgs::MarkerArray
-CollisionSpace::getDistanceFieldVisualization() const
+auto CollisionSpace::getDistanceFieldVisualization() const -> visual::Marker
 {
     return m_grid->getDistanceFieldVisualization();
 }
 
 /// \brief Return a visualization of the occupied voxels
-visualization_msgs::MarkerArray
-CollisionSpace::getOccupiedVoxelsVisualization() const
+auto CollisionSpace::getOccupiedVoxelsVisualization() const -> visual::Marker
 {
     return m_grid->getOccupiedVoxelsVisualization();
 }
@@ -466,7 +487,19 @@ bool CollisionSpace::checkCollision(
     return m_scm->checkCollision(*m_rcs, *m_abcs, m_gidx, dist);
 }
 
+bool CollisionSpace::checkCollision(const double* state, double& dist)
+{
+    updateState(state);
+    return m_scm->checkCollision(*m_rcs, *m_abcs, m_gidx, dist);
+}
+
 double CollisionSpace::collisionDistance(const std::vector<double>& state)
+{
+    updateState(state);
+    return m_scm->collisionDistance(*m_rcs, *m_abcs, m_gidx);
+}
+
+double CollisionSpace::collisionDistance(const double* state)
 {
     updateState(state);
     return m_scm->collisionDistance(*m_rcs, *m_abcs, m_gidx);
@@ -474,6 +507,14 @@ double CollisionSpace::collisionDistance(const std::vector<double>& state)
 
 bool CollisionSpace::collisionDetails(
     const std::vector<double>& state,
+    CollisionDetails& details)
+{
+    updateState(state);
+    return m_scm->collisionDetails(*m_rcs, *m_abcs, m_gidx, details);
+}
+
+bool CollisionSpace::collisionDetails(
+    const double* state,
     CollisionDetails& details)
 {
     updateState(state);
@@ -488,22 +529,16 @@ motion::Extension* CollisionSpace::getExtension(size_t class_code)
     return nullptr;
 }
 
-bool CollisionSpace::isStateValid(
-    const motion::RobotState& state,
-    bool verbose,
-    bool visualize,
-    double& dist)
+bool CollisionSpace::isStateValid(const motion::RobotState& state, bool verbose)
 {
-    dist = std::numeric_limits<double>::max();
+    double dist = std::numeric_limits<double>::max();
     return checkCollision(state, dist);
 }
 
 bool CollisionSpace::isStateToStateValid(
     const motion::RobotState& start,
     const motion::RobotState& finish,
-    int& path_length,
-    int& num_checks,
-    double &dist)
+    bool verbose)
 {
     const double res = 0.05;
 
@@ -514,13 +549,7 @@ bool CollisionSpace::isStateToStateValid(
             m_planning_joint_to_collision_model_indices, res,
             interp);
 
-    const bool verbose = false;
-
     const int inc_cc = 5;
-    double dist_temp = std::numeric_limits<double>::infinity();
-
-    // for debugging & statistical purposes
-    path_length = interp.waypointCount();
 
     motion::RobotState interm;
 
@@ -533,29 +562,17 @@ bool CollisionSpace::isStateToStateValid(
         // try to find collisions that might come later in the path earlier
         for (int i = 0; i < inc_cc; i++) {
             for (size_t j = i; j < interp.waypointCount(); j = j + inc_cc) {
-                num_checks++;
                 interp.interpolate(j, interm, m_planning_joint_to_collision_model_indices);
-                if (!isStateValid(interm, verbose, false, dist_temp)) {
-                    dist = dist_temp;
+                if (!isStateValid(interm, verbose)) {
                     return false;
-                }
-
-                if (dist_temp < dist) {
-                    dist = dist_temp;
                 }
             }
         }
     } else {
         for (size_t i = 0; i < interp.waypointCount(); i++) {
-            num_checks++;
             interp.interpolate(i, interm, m_planning_joint_to_collision_model_indices);
-            if (!isStateValid(interm, verbose, false, dist_temp)) {
-                dist = dist_temp;
+            if (!isStateValid(interm, verbose)) {
                 return false;
-            }
-
-            if (dist_temp < dist) {
-                dist = dist_temp;
             }
         }
     }
@@ -594,51 +611,18 @@ bool CollisionSpace::interpolatePath(
     return true;
 }
 
-visualization_msgs::MarkerArray
-CollisionSpace::getCollisionModelVisualization(const motion::RobotState& vals)
+auto CollisionSpace::getCollisionModelVisualization(const motion::RobotState& state)
+    -> std::vector<visual::Marker>
 {
-    return getCollisionRobotVisualization(vals);
-}
-
-/// \brief Retrieve visualization of the collision space
-///
-/// The visualization_msgs::MarkerArray's contents vary depending on the
-/// argument:
-///
-///     "world": markers representing all objects managed by the world
-///     "collision_world": cube list representing all occupied cells checked
-///             against the configured group
-///     "robot": visualization of the robot model at its current state
-///     "collision_robot": visualization of the robot collision model at its
-///             current state
-///     "collision_details": spheres representing the location of the most
-///             recent collision check
-///     "attached_object": spheres representing the bounding volumes of all
-///             attached objects
-///     <any argument excepted by OccupancyGrid::getVisualization>:
-///         <the corresponding visualization provided by OccupancyGrid>
-///
-/// \param type The type of visualization to get
-/// \return The visualization
-visualization_msgs::MarkerArray
-CollisionSpace::getVisualization(const std::string& type)
-{
-    if (type == "world") {
-        return getWorldVisualization();
-    } else if (type == "collision_world") {
-        return getCollisionWorldVisualization();
-    } else if (type == "robot") {
-        return getRobotVisualization();
-    } else if (type == "collision_robot") {
-        return getCollisionRobotVisualization();
-    } else if (type == "collision_details") {
-        // TODO: save the last state checked for collision?
-        return getCollisionDetailsVisualization(std::vector<double>(planningVariableCount(), 0)); }
-    else if (type == "attached_object") {
-        return visualization_msgs::MarkerArray();
-    } else {
-        return m_grid->getVisualization(type);
+    auto ma = getCollisionRobotVisualization(state);
+    std::vector<visual::Marker> markers;
+    markers.reserve(ma.markers.size());
+    visual::Marker m;
+    for (auto& mm : ma.markers) {
+        visual::ConvertMarkerMsgToMarker(mm, m);
+        markers.push_back(m);
     }
+    return markers;
 }
 
 CollisionSpace::CollisionSpace() :
@@ -715,9 +699,21 @@ bool CollisionSpace::init(
         return false;
     }
 
-    if (!setPlanningJoints(planning_joints)) {
-        ROS_ERROR_NAMED(CC_LOGGER, "Failed to set planning joints");
-        return false;
+    for (const std::string& joint_name : planning_joints) {
+        if (!m_rcm->hasJointVar(joint_name)) {
+            ROS_ERROR_NAMED(CC_LOGGER, "Joint variable '%s' not found in Robot Collision Model", joint_name.c_str());
+            return false;
+        }
+    }
+
+    // map planning joint indices to collision model indices
+    m_planning_joint_to_collision_model_indices.resize(planning_joints.size(), -1);
+
+    for (size_t i = 0; i < planning_joints.size(); ++i) {
+        const std::string& joint_name = planning_joints[i];;
+        int jidx = m_rcm->jointVarIndex(joint_name);
+
+        m_planning_joint_to_collision_model_indices[i] = jidx;
     }
 
     if (!m_rcm->hasGroup(group_name)) {
@@ -742,33 +738,15 @@ bool CollisionSpace::init(
     return true;
 }
 
-/// \brief Set the joint variables in the order they appear to isStateValid calls
-bool CollisionSpace::setPlanningJoints(
-    const std::vector<std::string>& joint_names)
-{
-    for (const std::string& joint_name : joint_names) {
-        if (!m_rcm->hasJointVar(joint_name)) {
-            ROS_ERROR_NAMED(CC_LOGGER, "Joint variable '%s' not found in Robot Collision Model", joint_name.c_str());
-            return false;
-        }
-    }
-
-    // map planning joint indices to collision model indices
-    m_planning_joint_to_collision_model_indices.resize(joint_names.size(), -1);
-
-    for (size_t i = 0; i < joint_names.size(); ++i) {
-        const std::string& joint_name = joint_names[i];;
-        int jidx = m_rcm->jointVarIndex(joint_name);
-
-        m_planning_joint_to_collision_model_indices[i] = jidx;
-    }
-
-    return true;
-}
-
 void CollisionSpace::updateState(const std::vector<double>& vals)
 {
     updateState(m_joint_vars, vals);
+    copyState();
+}
+
+void CollisionSpace::updateState(const double* state)
+{
+    updateState(m_joint_vars, state);
     copyState();
 }
 
@@ -776,9 +754,17 @@ void CollisionSpace::updateState(
     std::vector<double>& state,
     const std::vector<double>& vals)
 {
-    for (size_t i = 0; i < vals.size(); ++i) {
+    assert(vals.size() == m_planning_joint_to_collision_model_indices[i]);
+    updateState(state, vals.data());
+}
+
+void CollisionSpace::updateState(
+    std::vector<double>& state,
+    const double* vals)
+{
+    for (size_t i = 0; i < m_planning_joint_to_collision_model_indices.size(); ++i) {
         int jidx = m_planning_joint_to_collision_model_indices[i];
-        m_joint_vars[jidx] = vals[i];
+        state[jidx] = vals[i];
     }
 }
 
@@ -807,48 +793,83 @@ bool CollisionSpace::withinJointPositionLimits(
     return inside;
 }
 
-CollisionSpacePtr CollisionSpaceBuilder::build(
+auto BuildCollisionSpace(
     OccupancyGrid* grid,
     const std::string& urdf_string,
     const CollisionModelConfig& config,
     const std::string& group_name,
     const std::vector<std::string>& planning_joints)
+    -> std::unique_ptr<CollisionSpace>
 {
-    CollisionSpacePtr cspace(new CollisionSpace);
+    std::unique_ptr<CollisionSpace> cspace(new CollisionSpace);
     if (cspace->init(grid, urdf_string, config, group_name, planning_joints)) {
         return cspace;
     } else {
-        return CollisionSpacePtr();
+        return std::unique_ptr<CollisionSpace>();
     }
 }
 
-CollisionSpacePtr CollisionSpaceBuilder::build(
+auto BuildCollisionSpace(
     OccupancyGrid* grid,
     const urdf::ModelInterface& urdf,
     const CollisionModelConfig& config,
     const std::string& group_name,
     const std::vector<std::string>& planning_joints)
+    -> std::unique_ptr<CollisionSpace>
 {
-    CollisionSpacePtr cspace(new CollisionSpace);
+    std::unique_ptr<CollisionSpace> cspace(new CollisionSpace);
     if (cspace->init(grid, urdf, config, group_name, planning_joints)) {
         return cspace;
     } else {
-        return CollisionSpacePtr();
+        return std::unique_ptr<CollisionSpace>();
     }
 }
 
-CollisionSpacePtr CollisionSpaceBuilder::build(
+auto BuildCollisionSpace(
     OccupancyGrid* grid,
     const RobotCollisionModelConstPtr& rcm,
     const std::string& group_name,
     const std::vector<std::string>& planning_joints)
+    -> std::unique_ptr<CollisionSpace>
 {
-    CollisionSpacePtr cspace(new CollisionSpace);
+    std::unique_ptr<CollisionSpace> cspace(new CollisionSpace);
     if (cspace->init(grid, rcm, group_name, planning_joints)) {
         return cspace;
     } else {
-        return CollisionSpacePtr();
+        return std::unique_ptr<CollisionSpace>();
     }
+}
+
+auto CollisionSpaceBuilder::build(
+    OccupancyGrid* grid,
+    const std::string& urdf_string,
+    const CollisionModelConfig& config,
+    const std::string& group_name,
+    const std::vector<std::string>& planning_joints)
+    -> std::unique_ptr<CollisionSpace>
+{
+    return BuildCollisionSpace(grid, urdf_string, config, group_name, planning_joints);
+}
+
+auto CollisionSpaceBuilder::build(
+    OccupancyGrid* grid,
+    const urdf::ModelInterface& urdf,
+    const CollisionModelConfig& config,
+    const std::string& group_name,
+    const std::vector<std::string>& planning_joints)
+    -> std::unique_ptr<CollisionSpace>
+{
+    return BuildCollisionSpace(grid, urdf, config, group_name, planning_joints);
+}
+
+auto CollisionSpaceBuilder::build(
+    OccupancyGrid* grid,
+    const RobotCollisionModelConstPtr& rcm,
+    const std::string& group_name,
+    const std::vector<std::string>& planning_joints)
+    -> std::unique_ptr<CollisionSpace>
+{
+    return BuildCollisionSpace(grid, rcm, group_name, planning_joints);
 }
 
 } // namespace collision

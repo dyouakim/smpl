@@ -32,6 +32,8 @@
 #include <ros/ros.h>
 #include <smpl/occupancy_grid.h>
 #include <visualization_msgs/MarkerArray.h>
+#include <smpl/debug/visualize.h>
+#include <smpl/debug/visualizer_ros.h>
 #include <smpl/geometry/voxelize.h>
 
 int main(int argc, char* argv[])
@@ -39,8 +41,8 @@ int main(int argc, char* argv[])
     ros::init(argc, argv, "occupancy_grid_test");
     ros::NodeHandle nh;
 
-    ros::Publisher ma_pub = nh.advertise<visualization_msgs::MarkerArray>(
-            "visualization_markers", 100);
+    sbpl::VisualizerROS visualizer;
+    sbpl::visual::set_visualizer(&visualizer);
 
     const double size_x = 2.0, size_y = 2.0, size_z = 2.0;
     const double res = 0.02;
@@ -98,11 +100,11 @@ int main(int argc, char* argv[])
     auto markers = grid.getOccupiedVoxelsVisualization();
 
     ros::Duration(1.0).sleep(); // let ros and the publisher set up
-    ma_pub.publish(markers);
+    SV_SHOW_INFO(markers);
     ros::spinOnce();
     ros::Duration(1.0).sleep(); // let the publisher...publish
 
-    ma_pub.publish(grid.getBoundingBoxVisualization());
+    SV_SHOW_INFO(grid.getBoundingBoxVisualization());
     ros::Duration(1.0).sleep();
 
     return 0;

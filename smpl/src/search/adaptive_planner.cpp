@@ -35,28 +35,28 @@
 #include <chrono>
 
 // project includes
-#include <leatherman/print.h>
 #include <smpl/time.h>
+#include <smpl/console/console.h>
+#include <smpl/console/nonstd.h>
 
 namespace sbpl {
 namespace motion {
 
 AdaptivePlanner::AdaptivePlanner(
-    const RobotPlanningSpacePtr& pspace,
-    const RobotHeuristicPtr& heur)
+    RobotPlanningSpace* space,
+    RobotHeuristic* heur)
 :
-
-    m_planner(pspace.get(), heur.get()),
-    m_tracker(pspace.get(), heur.get()),
+    m_planner(space, heur),
+    m_tracker(space, heur),
     m_adaptive_graph(nullptr),
     m_start_state_id(-1),
     m_goal_state_id(-1),
     m_eps_plan(1.0),
     m_eps_track(1.0)
 {
-    m_adaptive_graph = pspace->getExtension<AdaptiveGraphExtension>();
+    m_adaptive_graph = space->getExtension<AdaptiveGraphExtension>();
     if (!m_adaptive_graph) {
-        ROS_WARN("Adaptive Planner recommends Adaptive Graph Extension");
+        SMPL_WARN("Adaptive Planner recommends Adaptive Graph Extension");
     }
 }
 
@@ -154,7 +154,7 @@ int AdaptivePlanner::replan(
     int* cost)
 {
     if (m_start_state_id == -1 || m_goal_state_id == -1) {
-        ROS_ERROR("Start or goal state is not set");
+        SMPL_ERROR("Start or goal state is not set");
         return !NO_START_OR_GOAL_SET;
     }
 
@@ -174,13 +174,13 @@ int AdaptivePlanner::replan(
     if (!m_planner.set_start(m_start_state_id) ||
         !m_tracker.set_start(m_start_state_id))
     {
-        ROS_ERROR("Failed to set start state");
+        SMPL_ERROR("Failed to set start state");
         return !FAILED_TO_SET_START;
     }
     if (!m_planner.set_goal(m_goal_state_id) ||
         !m_tracker.set_goal(m_goal_state_id))
     {
-        ROS_ERROR("Failed to set goal state");
+        SMPL_ERROR("Failed to set goal state");
         return !FAILED_TO_SET_GOAL;
     }
 
@@ -202,27 +202,27 @@ int AdaptivePlanner::replan(
         auto plan_start = clock::now();
         m_adaptive_graph->setPlanMode();
         m_planner.force_planning_from_scratch();
-        ROS_INFO("Time remaining: %0.3fs. Plan low-dimensional path", time_remaining);
+        SMPL_INFO("Time remaining: %0.3fs. Plan low-dimensional path", time_remaining);
         ARAStar::TimeParameters time_params = m_time_params.planning;
         time_params.max_allowed_time_init = to_duration(time_remaining);
         time_params.max_allowed_time = std::min(time_params.max_allowed_time, to_duration(time_remaining));
         res = m_planner.replan(time_params, &plan_path, &plan_cost);
         auto plan_finish = clock::now();
 
-        ROS_INFO("Planner terminated");
-        ROS_INFO("  Path: %s", to_string(plan_path).c_str());
-        ROS_INFO("  Cost: %d", plan_cost);
-        ROS_INFO("  Time: %0.3f", m_planner.get_final_eps_planning_time());
-        ROS_INFO("  Expansions: %d", m_planner.get_n_expands());
-        ROS_INFO("  Suboptimality Bound: %0.3f", m_planner.get_solution_eps());
+        SMPL_INFO("Planner terminated");
+        SMPL_INFO_STREAM("  Path: " << plan_path);
+        SMPL_INFO("  Cost: %d", plan_cost);
+        SMPL_INFO("  Time: %0.3f", m_planner.get_final_eps_planning_time());
+        SMPL_INFO("  Expansions: %d", m_planner.get_n_expands());
+        SMPL_INFO("  Suboptimality Bound: %0.3f", m_planner.get_solution_eps());
 
         if (!res) {
-            ROS_WARN("Failed to find least-cost path in G^ad");
+            SMPL_WARN("Failed to find least-cost path in G^ad");
             return !FAILED_TO_FIND_PATH;
         }
 
         if (m_adaptive_graph->isExecutable(plan_path)) {
-            ROS_INFO("Found path during planning on iteration %d", iter_count);
+            SMPL_INFO("Found path during planning on iteration %d", iter_count);
             *solution = std::move(plan_path);
             *cost = plan_cost;
             return !SUCCESS;
@@ -232,7 +232,7 @@ int AdaptivePlanner::replan(
         time_remaining = std::max(0.0, time_remaining);
 
         if (time_remaining == 0.0) {
-            ROS_WARN("No time to track!");
+            SMPL_WARN("No time to track!");
             return !TIMED_OUT;
         }
 
@@ -241,19 +241,19 @@ int AdaptivePlanner::replan(
         auto track_start = clock::now();
         m_adaptive_graph->setTrackMode(plan_path);
         m_tracker.force_planning_from_scratch();
-        ROS_INFO("Time remaining: %0.3fs. Track low-dimensional path", time_remaining);
+        SMPL_INFO("Time remaining: %0.3fs. Track low-dimensional path", time_remaining);
         time_params = m_time_params.tracking;
         time_params.max_allowed_time_init = to_duration(time_remaining);
         time_params.max_allowed_time = std::min(time_params.max_allowed_time, to_duration(time_remaining));
         res = m_tracker.replan(time_params, &track_path, &track_cost);
         auto track_finish = clock::now();
 
-        ROS_INFO("Tracker terminated");
-        ROS_INFO("  Path: %s", to_string(track_path).c_str());
-        ROS_INFO("  Cost: %d", track_cost);
-        ROS_INFO("  Time: %0.3f", m_tracker.get_final_eps_planning_time());
-        ROS_INFO("  Expansions: %d", m_tracker.get_n_expands());
-        ROS_INFO("  Suboptimality Bound: %0.3f", m_tracker.get_solution_eps());
+        SMPL_INFO("Tracker terminated");
+        SMPL_INFO_STREAM("  Path: " << track_path);
+        SMPL_INFO("  Cost: %d", track_cost);
+        SMPL_INFO("  Time: %0.3f", m_tracker.get_final_eps_planning_time());
+        SMPL_INFO("  Expansions: %d", m_tracker.get_n_expands());
+        SMPL_INFO("  Suboptimality Bound: %0.3f", m_tracker.get_solution_eps());
 
         time_remaining -= to_seconds(plan_finish - plan_start);
         time_remaining = std::max(0.0, time_remaining);
@@ -271,16 +271,16 @@ int AdaptivePlanner::replan(
 
             if (finished) {
                 if (track_cost <= m_eps_track * plan_cost) {
-                    ROS_INFO("Solution accepted (%d <= %0.3f * %d)", track_cost, m_eps_track, plan_cost);
+                    SMPL_INFO("Solution accepted (%d <= %0.3f * %d)", track_cost, m_eps_track, plan_cost);
                     // solution quality is acceptable
                     done = true;
                     *solution = track_path;
                     *cost = track_cost;
                     return !SUCCESS;
                 } else {
-                    ROS_INFO("Solution rejected (%d > %0.3f * %d)", track_cost, m_eps_track, plan_cost);
+                    SMPL_INFO("Solution rejected (%d > %0.3f * %d)", track_cost, m_eps_track, plan_cost);
                     if (time_remaining == 0.0) {
-                        ROS_WARN("Ran out of time after tracking phase");
+                        SMPL_WARN("Ran out of time after tracking phase");
                         return !TIMED_OUT;
                     }
                     // tracker solution quality is poor: identify the largest
@@ -291,25 +291,25 @@ int AdaptivePlanner::replan(
                 }
             } else {
                 if (time_remaining == 0.0) {
-                    ROS_WARN("Ran out of time after tracking phase");
+                    SMPL_WARN("Ran out of time after tracking phase");
                     return !TIMED_OUT;
                 }
-                ROS_INFO("Add/Grow sphere at (terminal) state %d", track_path.back());
+                SMPL_INFO("Add/Grow sphere at (terminal) state %d", track_path.back());
                 m_adaptive_graph->addHighDimRegion(track_path.back());
             }
         } else {
             if (time_remaining == 0.0) {
-                ROS_WARN("Ran out of time after tracking phase");
+                SMPL_WARN("Ran out of time after tracking phase");
                 return !TIMED_OUT;
             }
             // tracker failed to find a solution
             int best_state_id = select_random_path_state(plan_path);
-            ROS_INFO("Add/Grow sphere at (random) state %d", best_state_id);
+            SMPL_INFO("Add/Grow sphere at (random) state %d", best_state_id);
             m_adaptive_graph->addHighDimRegion(best_state_id);
         }
     }
 
-    ROS_INFO("Failed to find solution");
+    SMPL_INFO("Failed to find solution");
     return !TIMED_OUT;
 }
 

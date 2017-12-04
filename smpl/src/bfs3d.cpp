@@ -32,6 +32,8 @@
 
 #include <smpl/bfs3d/bfs3d.h>
 
+#include <smpl/console/console.h>
+
 namespace sbpl {
 namespace motion {
 
@@ -175,15 +177,15 @@ void BFS_3D::run(int x, int y, int z)
     m_distance_grid[origin] = 0;
 
     // fire off background thread to compute bfs
-    m_search_thread = boost::thread(
+    m_search_thread = std::thread(
             static_cast<void (BFS_3D::*)(int, int, int volatile*, int*, int&, int&)>(&BFS_3D::search),
             this,
             m_dim_x,
             m_dim_xy,
             m_distance_grid,
             m_queue,
-            m_queue_head,
-            m_queue_tail);
+            std::ref(m_queue_head),
+            std::ref(m_queue_tail));
     m_running = true;
 }
 
@@ -265,7 +267,7 @@ void BFS_3D::run_components(int gx, int gy, int gz)
         ++num_iterations;
     }
 
-    ROS_INFO("Computed entire distance field in %d iterations", num_iterations);
+    SMPL_INFO("Computed entire distance field in %d iterations", num_iterations);
 
     // combine distance fields
     for (int i = 0; i < m_dim_xyz; ++i) {
@@ -278,7 +280,7 @@ void BFS_3D::run_components(int gx, int gy, int gz)
 bool BFS_3D::escapeCell(int x, int y, int z)
 {
     if (!inBounds(x, y, z)) {
-        ROS_ERROR("BFS goal is out of bounds");
+        SMPL_ERROR("BFS goal is out of bounds");
         return false;
     }
 
@@ -315,7 +317,7 @@ bool BFS_3D::escapeCell(int x, int y, int z)
         ++escape_count;
     }
 
-    ROS_INFO("Escaped goal cell in %d expansions", escape_count);
+    SMPL_INFO("Escaped goal cell in %d expansions", escape_count);
 
     // TODO: return false if no free cells (escape_count == width * height * depth?)
     return true;
@@ -349,7 +351,7 @@ void BFS_3D::visit_free_cells(int node, const Visitor& visitor)
                 // times
                 visited[nn] = true;
                 if (nodes.size() >= m_dim_xyz) {
-                    ROS_ERROR("Wow queue is too damn big");
+                    SMPL_ERROR("Wow queue is too damn big");
                     return;
                 }
             }
@@ -399,7 +401,7 @@ int BFS_3D::getNearestFreeNodeDist(int x, int y, int z)
             if (cell_dist < 0) {
                 // TODO: mark as a wall, and move on
                 setWall(nx, ny, nz);
-                ROS_INFO("Encountered isolated cell, m_running: %s", m_running ? "true" : "false");
+                SMPL_INFO("Encountered isolated cell, m_running: %s", m_running ? "true" : "false");
             }
             else {
                 return dist + cell_dist;

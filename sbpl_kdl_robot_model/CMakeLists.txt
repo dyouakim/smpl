@@ -7,6 +7,7 @@ list(APPEND CMAKE_CXX_FLAGS "-std=c++11")
 find_package(catkin
     REQUIRED
     COMPONENTS
+        kdl_parser
         leatherman
         roscpp
         smpl
@@ -27,8 +28,8 @@ catkin_package(
     DEPENDS
         orocos_kdl)
 
-include_directories(${catkin_INCLUDE_DIRS})
-include_directories(${orocos_kdl_INCLUDE_DIRS})
+include_directories(SYSTEM ${catkin_INCLUDE_DIRS})
+include_directories(SYSTEM ${orocos_kdl_INCLUDE_DIRS})
 include_directories(include)
 
 add_library(sbpl_kdl_robot_model src/kdl_robot_model.cpp)

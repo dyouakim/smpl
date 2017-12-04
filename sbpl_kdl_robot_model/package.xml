@@ -8,6 +8,7 @@
 
     <buildtool_depend>catkin</buildtool_depend>
 
+    <depend>kdl_parser</depend>
     <depend>leatherman</depend>
     <depend>orocos_kdl</depend>
     <depend>roscpp</depend>

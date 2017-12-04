@@ -19,7 +19,7 @@ find_package(catkin
 
 catkin_package()
 
-include_directories(${catkin_INCLUDE_DIRS})
+include_directories(SYSTEM ${catkin_INCLUDE_DIRS})
 
 #add_executable(test_collision_model src/test_collision_model.cpp)
 #target_link_libraries(test_collision_model ${catkin_LIBRARIES})

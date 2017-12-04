@@ -38,9 +38,11 @@
 // project includes
 #include <smpl/grid.h>
 #include <smpl/intrusive_heap.h>
+#include <smpl/debug/marker.h>
 #include <smpl/graph/experience_graph_extension.h>
 #include <smpl/heuristic/egraph_heuristic.h>
 #include <smpl/heuristic/robot_heuristic.h>
+#include <smpl/occupancy_grid.h>
 
 namespace sbpl {
 namespace motion {
@@ -51,12 +53,18 @@ class DijkstraEgraphHeuristic3D :
 {
 public:
 
-    DijkstraEgraphHeuristic3D(
-        const RobotPlanningSpacePtr& pspace,
-        const OccupancyGrid* grid);
+    bool init(RobotPlanningSpace* space, const OccupancyGrid* grid);
 
-    visualization_msgs::MarkerArray getWallsVisualization();
-    visualization_msgs::MarkerArray getValuesVisualization();
+    auto grid() const -> const OccupancyGrid* { return m_grid; }
+
+    double weightEGraph() const { return m_eg_eps; }
+    void setWeightEGraph(double w);
+
+    double inflationRadius() const { return m_inflation_radius; }
+    void setInflationRadius(double radius);
+
+    auto getWallsVisualization() -> visual::Marker;
+    auto getValuesVisualization() -> visual::Marker;
 
     /// \name Required Public Functions from ExperienceGraphHeuristicExtension
     ///@{
@@ -98,6 +106,8 @@ private:
     static const int Wall = std::numeric_limits<int>::max();
     static const int Infinity = Unknown;
 
+    const OccupancyGrid* m_grid = nullptr;
+
     struct Cell : public heap_element
     {
         int dist;
@@ -115,12 +125,13 @@ private:
         }
     };
 
-    double m_eg_eps;
+    double m_eg_eps = 1.0;
+    double m_inflation_radius = 0.0;
 
     intrusive_heap<Cell, CellCompare> m_open;
 
-    PointProjectionExtension* m_pp;
-    ExperienceGraphExtension* m_eg;
+    PointProjectionExtension* m_pp = nullptr;
+    ExperienceGraphExtension* m_eg = nullptr;
 
     // map down-projected state cells to adjacent down-projected state cells
     struct Vector3iHash

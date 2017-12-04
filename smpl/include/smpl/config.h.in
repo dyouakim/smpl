@@ -1,0 +1,12 @@
+#ifndef SMPL_CONFIG_H
+#define SMPL_CONFIG_H
+
+#ifndef SMPL_CLOCK_API
+#define SMPL_CLOCK_API @SMPL_CLOCK_API@
+#endif
+
+#ifndef SMPL_SV_VISUALIZATION_MSGS
+#cmakedefine SMPL_SV_VISUALIZATION_MSGS
+#endif
+
+#endif

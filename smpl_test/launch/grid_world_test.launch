@@ -1,5 +1,10 @@
 <launch>
+<<<<<<< HEAD
     <node name="grid_world_test" pkg="smpl_test" type="xytheta" output="screen">
         <param name="mprim_path" value="$(find smpl_test)/config/xy_8_connected.mprim"/>
+=======
+    <node name="grid_world_test" pkg="smpl_test" type="xytheta" output="screen"
+            args="$(find smpl_test)/config/xy_8_connected.mprim">
+>>>>>>> a4762c393f0992b7ae7888212fc30deae0db0244
     </node>
 </launch>

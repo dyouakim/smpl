@@ -37,19 +37,21 @@
 #include <string>
 #include <unordered_map>
 
+#include <smpl/config.h>
+
 // system includes
-//#include <ros/console.h>
+#ifdef SMPL_SV_VISUALIZATION_MSGS
 #include <visualization_msgs/MarkerArray.h>
+#endif
 
 // project includes
 #include <smpl/time.h>
+#include <smpl/debug/marker.h>
 
 namespace sbpl {
-namespace viz {
+namespace visual {
 
-namespace levels {
-
-enum Level
+enum struct Level
 {
     Invalid = -1,
     Debug,
@@ -61,8 +63,6 @@ enum Level
     NumLevels
 };
 
-} // namespace levels
-
 /// \name Global Visualizer
 ///@{
 
@@ -72,37 +72,44 @@ public:
 
     virtual ~VisualizerBase() { }
 
-    virtual void visualize(
-        levels::Level level,
-        const visualization_msgs::MarkerArray& markers) = 0;
+    virtual void visualize(Level level, const visual::Marker& marker);
+    virtual void visualize(Level level, const std::vector<visual::Marker>& markers);
+#ifdef SMPL_SV_VISUALIZATION_MSGS
+    virtual void visualize(Level level, const visualization_msgs::Marker& m);
+    virtual void visualize(Level level, const visualization_msgs::MarkerArray& markers);
+#endif
 };
 
 void set_visualizer(VisualizerBase* visualizer);
 void unset_visualizer();
-VisualizerBase* visualizer();
+auto visualizer() -> VisualizerBase*;
 
 ///@}
 
 /// \name Global Visualization Management
 ///@{
 
-using VisualizationMap = std::unordered_map<std::string, levels::Level>;
+using VisualizationMap = std::unordered_map<std::string, Level>;
 void get_visualizations(VisualizationMap& visualizations);
 
-bool set_visualization_level(const std::string& name, levels::Level level);
+bool set_visualization_level(const std::string& name, Level level);
 
 ///@}
 
 /// \name Internal
 ///@{
-void visualize(
-    levels::Level level,
-    const visualization_msgs::MarkerArray& markers);
+
+void visualize(Level level, const visual::Marker& marker);
+void visualize(Level level, const std::vector<visual::Marker>& markers);
+#ifdef SMPL_SV_VISUALIZATION_MSGS
+void visualize(Level level, const visualization_msgs::Marker& marker);
+void visualize(Level level, const visualization_msgs::MarkerArray& markers);
+#endif
 
 struct VizLocation {
     void* handle; // struct representing the named visualization at location
     VizLocation *next; // forward list pointer to the next viz location
-    ::sbpl::viz::levels::Level level;
+    ::sbpl::visual::Level level;
     bool initialized;
     bool enabled;
 };
@@ -110,10 +117,13 @@ struct VizLocation {
 void InitializeVizLocation(
     VizLocation* loc,
     const std::string& name,
-    levels::Level level);
+    Level level);
 ///@}
 
 } // namespace viz
+
+namespace viz = visual;
+
 } // namespace sbpl
 
 #define SBPL_VISUALIZE_SEVERITY_DEBUG   0
@@ -136,10 +146,10 @@ void InitializeVizLocation(
 #endif
 
 #define SV_SHOW_DEFINE_LOCATION(cond_, level_, name_) \
-    static ::sbpl::viz::VizLocation __sv_define_location__loc = { \
+    static ::sbpl::visual::VizLocation __sv_define_location__loc = { \
              nullptr, \
              nullptr, \
-            ::sbpl::viz::levels::NumLevels, \
+            ::sbpl::visual::Level::NumLevels, \
             false, \
             false, \
     }; \
@@ -153,7 +163,7 @@ void InitializeVizLocation(
     do { \
         SV_SHOW_DEFINE_LOCATION(cond, level, name); \
         if (__sv_define_location__enabled) { \
-            ::sbpl::viz::visualize(level, markers); \
+            ::sbpl::visual::visualize(level, markers); \
         } \
     } \
     while (0)
@@ -163,7 +173,7 @@ void InitializeVizLocation(
         static bool hit = false; \
         if (!hit) { \
             hit = true; \
-            ::sbpl::viz::visualize(level, markers); \
+            ::sbpl::visual::visualize(level, markers); \
         } \
     } while (0)
 
@@ -176,7 +186,7 @@ void InitializeVizLocation(
         auto now = ::sbpl::clock::now(); \
         if (last_hit + rate_dur <= now) { \
             last_hit = now; \
-            ::sbpl::viz::visualize(level, markers); \
+            ::sbpl::visual::visualize(level, markers); \
         } \
     } while (0)
 
@@ -192,14 +202,14 @@ void InitializeVizLocation(
 #define SV_SHOW_DEBUG_ONCE(markers)
 #define SV_SHOW_DEBUG_ONCE_NAMED(name, markers)
 #else
-#define SV_SHOW_DEBUG(markers) SV_SHOW(::sbpl::viz::levels::Debug, SV_NAME_PREFIX, markers)
-#define SV_SHOW_DEBUG_NAMED(name, markers) SV_SHOW(::sbpl::viz::levels::Debug, std::string(SV_NAME_PREFIX) + "." + name, markers)
-#define SV_SHOW_DEBUG_COND(cond, markers) SV_SHOW_COND(cond, ::sbpl::viz::levels::Debug, SV_NAME_PREFIX, markers)
-#define SV_SHOW_DEBUG_COND_NAMED(name, cond, markers) SV_SHOW_COND(cond, ::sbpl::viz::levels::Debug, std::string(SV_NAME_PREFIX) + "." + name, markers)
-#define SV_SHOW_DEBUG_THROTTLE(rate, markers) SV_SHOW_THROTTLE(rate, ::sbpl::viz::levels::Debug, SV_NAME_PREFIX, markers)
-#define SV_SHOW_DEBUG_THROTTLE_NAMED(name, rate, markers) SV_SHOW_THROTTLE(rate, ::sbpl::viz::levels::Debug, std::string(SV_NAME_PREFIX) + "." + name, markers)
-#define SV_SHOW_DEBUG_ONCE(markers) SV_SHOW_ONCE(::sbpl::viz::levels::Debug, SV_NAME_PREFIX, markers)
-#define SV_SHOW_DEBUG_ONCE_NAMED(name, markers) SV_SHOW_ONCE(::sbpl::viz::levels::Debug, std::string(SV_NAME_PREFIX) + "." + name, markers)
+#define SV_SHOW_DEBUG(markers) SV_SHOW(::sbpl::visual::Level::Debug, SV_NAME_PREFIX, markers)
+#define SV_SHOW_DEBUG_NAMED(name, markers) SV_SHOW(::sbpl::visual::Level::Debug, std::string(SV_NAME_PREFIX) + "." + name, markers)
+#define SV_SHOW_DEBUG_COND(cond, markers) SV_SHOW_COND(cond, ::sbpl::visual::Level::Debug, SV_NAME_PREFIX, markers)
+#define SV_SHOW_DEBUG_COND_NAMED(name, cond, markers) SV_SHOW_COND(cond, ::sbpl::visual::Level::Debug, std::string(SV_NAME_PREFIX) + "." + name, markers)
+#define SV_SHOW_DEBUG_THROTTLE(rate, markers) SV_SHOW_THROTTLE(rate, ::sbpl::visual::Level::Debug, SV_NAME_PREFIX, markers)
+#define SV_SHOW_DEBUG_THROTTLE_NAMED(name, rate, markers) SV_SHOW_THROTTLE(rate, ::sbpl::visual::Level::Debug, std::string(SV_NAME_PREFIX) + "." + name, markers)
+#define SV_SHOW_DEBUG_ONCE(markers) SV_SHOW_ONCE(::sbpl::visual::Level::Debug, SV_NAME_PREFIX, markers)
+#define SV_SHOW_DEBUG_ONCE_NAMED(name, markers) SV_SHOW_ONCE(::sbpl::visual::Level::Debug, std::string(SV_NAME_PREFIX) + "." + name, markers)
 #endif
 
 #if (SBPL_VISUALIZE_MIN_SEVERITY > SBPL_VISUALIZE_SEVERITY_INFO)
@@ -212,14 +222,14 @@ void InitializeVizLocation(
 #define SV_SHOW_INFO_ONCE(markers)
 #define SV_SHOW_INFO_ONCE_NAMED(name, markers)
 #else
-#define SV_SHOW_INFO(markers) SV_SHOW(::sbpl::viz::levels::Info, SV_NAME_PREFIX, markers)
-#define SV_SHOW_INFO_NAMED(name, markers) SV_SHOW(::sbpl::viz::levels::Info, std::string(SV_NAME_PREFIX) + "." + name, markers)
-#define SV_SHOW_INFO_COND(cond, markers) SV_SHOW_COND(cond, ::sbpl::viz::levels::Info, SV_NAME_PREFIX, markers)
-#define SV_SHOW_INFO_COND_NAMED(name, cond, markers) SV_SHOW_COND(cond, ::sbpl::viz::levels::Info, std::string(SV_NAME_PREFIX) + "." + name, markers)
-#define SV_SHOW_INFO_THROTTLE(rate, markers) SV_SHOW_THROTTLE(rate, ::sbpl::viz::levels::Info, SV_NAME_PREFIX, markers)
-#define SV_SHOW_INFO_THROTTLE_NAMED(name, rate, markers) SV_SHOW_THROTTLE(rate, ::sbpl::viz::levels::Info, std::string(SV_NAME_PREFIX) + "." + name, markers)
-#define SV_SHOW_INFO_ONCE(markers) SV_SHOW_ONCE(::sbpl::viz::levels::Info, SV_NAME_PREFIX, markers)
-#define SV_SHOW_INFO_ONCE_NAMED(name, markers) SV_SHOW_ONCE(::sbpl::viz::levels::Info, std::string(SV_NAME_PREFIX) + "." + name, markers)
+#define SV_SHOW_INFO(markers) SV_SHOW(::sbpl::visual::Level::Info, SV_NAME_PREFIX, markers)
+#define SV_SHOW_INFO_NAMED(name, markers) SV_SHOW(::sbpl::visual::Level::Info, std::string(SV_NAME_PREFIX) + "." + name, markers)
+#define SV_SHOW_INFO_COND(cond, markers) SV_SHOW_COND(cond, ::sbpl::visual::Level::Info, SV_NAME_PREFIX, markers)
+#define SV_SHOW_INFO_COND_NAMED(name, cond, markers) SV_SHOW_COND(cond, ::sbpl::visual::Level::Info, std::string(SV_NAME_PREFIX) + "." + name, markers)
+#define SV_SHOW_INFO_THROTTLE(rate, markers) SV_SHOW_THROTTLE(rate, ::sbpl::visual::Level::Info, SV_NAME_PREFIX, markers)
+#define SV_SHOW_INFO_THROTTLE_NAMED(name, rate, markers) SV_SHOW_THROTTLE(rate, ::sbpl::visual::Level::Info, std::string(SV_NAME_PREFIX) + "." + name, markers)
+#define SV_SHOW_INFO_ONCE(markers) SV_SHOW_ONCE(::sbpl::visual::Level::Info, SV_NAME_PREFIX, markers)
+#define SV_SHOW_INFO_ONCE_NAMED(name, markers) SV_SHOW_ONCE(::sbpl::visual::Level::Info, std::string(SV_NAME_PREFIX) + "." + name, markers)
 #endif
 
 #if (SBPL_VISUALIZE_MIN_SEVERITY > SBPL_VISUALIZE_SEVERITY_WARN)
@@ -232,14 +242,14 @@ void InitializeVizLocation(
 #define SV_SHOW_WARN_ONCE(markers)
 #define SV_SHOW_WARN_ONCE_NAMED(name, markers)
 #else
-#define SV_SHOW_WARN(markers) SV_SHOW(::sbpl::viz::levels::Warn, SV_NAME_PREFIX, markers)
-#define SV_SHOW_WARN_NAMED(name, markers) SV_SHOW(::sbpl::viz::levels::Warn, std::string(SV_NAME_PREFIX) + "." + name, markers)
-#define SV_SHOW_WARN_COND(cond, markers) SV_SHOW_COND(cond, ::sbpl::viz::levels::Warn, SV_NAME_PREFIX, markers)
-#define SV_SHOW_WARN_COND_NAMED(name, cond, markers) SV_SHOW_COND(cond, ::sbpl::viz::levels::Warn, std::string(SV_NAME_PREFIX) + "." + name, markers)
-#define SV_SHOW_WARN_THROTTLE(rate, markers) SV_SHOW_THROTTLE(rate, ::sbpl::viz::levels::Warn, SV_NAME_PREFIX, markers)
-#define SV_SHOW_WARN_THROTTLE_NAMED(name, rate, markers) SV_SHOW_THROTTLE(rate, ::sbpl::viz::levels::Warn, std::string(SV_NAME_PREFIX) + "." + name, markers)
-#define SV_SHOW_WARN_ONCE(markers) SV_SHOW_ONCE(::sbpl::viz::levels::Warn, SV_NAME_PREFIX, markers)
-#define SV_SHOW_WARN_ONCE_NAMED(name, markers) SV_SHOW_ONCE(::sbpl::viz::levels::Warn, std::string(SV_NAME_PREFIX) + "." + name, markers)
+#define SV_SHOW_WARN(markers) SV_SHOW(::sbpl::visual::Level::Warn, SV_NAME_PREFIX, markers)
+#define SV_SHOW_WARN_NAMED(name, markers) SV_SHOW(::sbpl::visual::Level::Warn, std::string(SV_NAME_PREFIX) + "." + name, markers)
+#define SV_SHOW_WARN_COND(cond, markers) SV_SHOW_COND(cond, ::sbpl::visual::Level::Warn, SV_NAME_PREFIX, markers)
+#define SV_SHOW_WARN_COND_NAMED(name, cond, markers) SV_SHOW_COND(cond, ::sbpl::visual::Level::Warn, std::string(SV_NAME_PREFIX) + "." + name, markers)
+#define SV_SHOW_WARN_THROTTLE(rate, markers) SV_SHOW_THROTTLE(rate, ::sbpl::visual::Level::Warn, SV_NAME_PREFIX, markers)
+#define SV_SHOW_WARN_THROTTLE_NAMED(name, rate, markers) SV_SHOW_THROTTLE(rate, ::sbpl::visual::Level::Warn, std::string(SV_NAME_PREFIX) + "." + name, markers)
+#define SV_SHOW_WARN_ONCE(markers) SV_SHOW_ONCE(::sbpl::visual::Level::Warn, SV_NAME_PREFIX, markers)
+#define SV_SHOW_WARN_ONCE_NAMED(name, markers) SV_SHOW_ONCE(::sbpl::visual::Level::Warn, std::string(SV_NAME_PREFIX) + "." + name, markers)
 #endif
 
 #if (SBPL_VISUALIZE_MIN_SEVERITY > SBPL_VISUALIZE_SEVERITY_ERROR)
@@ -252,14 +262,14 @@ void InitializeVizLocation(
 #define SV_SHOW_ERROR_ONCE(markers)
 #define SV_SHOW_ERROR_ONCE_NAMED(name, markers)
 #else
-#define SV_SHOW_ERROR(markers) SV_SHOW(::sbpl::viz::levels::Error, SV_NAME_PREFIX, markers)
-#define SV_SHOW_ERROR_NAMED(name, markers) SV_SHOW(::sbpl::viz::levels::Error, std::string(SV_NAME_PREFIX) + "." + name, markers)
-#define SV_SHOW_ERROR_COND(cond, markers) SV_SHOW_COND(cond, ::sbpl::viz::levels::Error, SV_NAME_PREFIX, markers)
-#define SV_SHOW_ERROR_COND_NAMED(name, cond, markers) SV_SHOW_COND(cond, ::sbpl::viz::levels::Error, std::string(SV_NAME_PREFIX) + "." + name, markers)
-#define SV_SHOW_ERROR_THROTTLE(rate, markers) SV_SHOW_THROTTLE(rate, ::sbpl::viz::levels::Error, SV_NAME_PREFIX, markers)
-#define SV_SHOW_ERROR_THROTTLE_NAMED(name, rate, markers) SV_SHOW_THROTTLE(rate, ::sbpl::viz::levels::Error, std::string(SV_NAME_PREFIX) + "." + name, markers)
-#define SV_SHOW_ERROR_ONCE(markers) SV_SHOW_ONCE(::sbpl::viz::levels::Error, SV_NAME_PREFIX, markers)
-#define SV_SHOW_ERROR_ONCE_NAMED(name, markers) SV_SHOW_ONCE(::sbpl::viz::levels::Error, std::string(SV_NAME_PREFIX) + "." + name, markers)
+#define SV_SHOW_ERROR(markers) SV_SHOW(::sbpl::visual::Level::Error, SV_NAME_PREFIX, markers)
+#define SV_SHOW_ERROR_NAMED(name, markers) SV_SHOW(::sbpl::visual::Level::Error, std::string(SV_NAME_PREFIX) + "." + name, markers)
+#define SV_SHOW_ERROR_COND(cond, markers) SV_SHOW_COND(cond, ::sbpl::visual::Level::Error, SV_NAME_PREFIX, markers)
+#define SV_SHOW_ERROR_COND_NAMED(name, cond, markers) SV_SHOW_COND(cond, ::sbpl::visual::Level::Error, std::string(SV_NAME_PREFIX) + "." + name, markers)
+#define SV_SHOW_ERROR_THROTTLE(rate, markers) SV_SHOW_THROTTLE(rate, ::sbpl::visual::Level::Error, SV_NAME_PREFIX, markers)
+#define SV_SHOW_ERROR_THROTTLE_NAMED(name, rate, markers) SV_SHOW_THROTTLE(rate, ::sbpl::visual::Level::Error, std::string(SV_NAME_PREFIX) + "." + name, markers)
+#define SV_SHOW_ERROR_ONCE(markers) SV_SHOW_ONCE(::sbpl::visual::Level::Error, SV_NAME_PREFIX, markers)
+#define SV_SHOW_ERROR_ONCE_NAMED(name, markers) SV_SHOW_ONCE(::sbpl::visual::Level::Error, std::string(SV_NAME_PREFIX) + "." + name, markers)
 #endif
 
 #if (SBPL_VISUALIZE_MIN_SEVERITY > SBPL_VISUALIZE_SEVERITY_FATAL)
@@ -272,14 +282,14 @@ void InitializeVizLocation(
 #define SV_SHOW_FATAL_ONCE(markers)
 #define SV_SHOW_FATAL_ONCE_NAMED(name, markers)
 #else
-#define SV_SHOW_FATAL(markers) SV_SHOW(::sbpl::viz::levels::Fatal, SV_NAME_PREFIX, markers)
-#define SV_SHOW_FATAL_NAMED(name, markers) SV_SHOW(::sbpl::viz::levels::Fatal, std::string(SV_NAME_PREFIX) + "." + name, markers)
-#define SV_SHOW_FATAL_COND(cond, markers) SV_SHOW_COND(cond, ::sbpl::viz::levels::Fatal, SV_NAME_PREFIX, markers)
-#define SV_SHOW_FATAL_COND_NAMED(name, cond, markers) SV_SHOW_COND(cond, ::sbpl::viz::levels::Fatal, std::string(SV_NAME_PREFIX) + "." + name, markers)
-#define SV_SHOW_FATAL_THROTTLE(rate, markers) SV_SHOW_THROTTLE(rate, ::sbpl::viz::levels::Fatal, SV_NAME_PREFIX, markers)
-#define SV_SHOW_FATAL_THROTTLE_NAMED(name, rate, markers) SV_SHOW_THROTTLE(rate, ::sbpl::viz::levels::Fatal, std::string(SV_NAME_PREFIX) + "." + name, markers)
-#define SV_SHOW_FATAL_ONCE(markers) SV_SHOW_ONCE(::sbpl::viz::levels::Fatal, SV_NAME_PREFIX, markers)
-#define SV_SHOW_FATAL_ONCE_NAMED(name, markers) SV_SHOW_ONCE(::sbpl::viz::levels::Fatal, std::string(SV_NAME_PREFIX) + "." + name, markers)
+#define SV_SHOW_FATAL(markers) SV_SHOW(::sbpl::visual::Level::Fatal, SV_NAME_PREFIX, markers)
+#define SV_SHOW_FATAL_NAMED(name, markers) SV_SHOW(::sbpl::visual::Level::Fatal, std::string(SV_NAME_PREFIX) + "." + name, markers)
+#define SV_SHOW_FATAL_COND(cond, markers) SV_SHOW_COND(cond, ::sbpl::visual::Level::Fatal, SV_NAME_PREFIX, markers)
+#define SV_SHOW_FATAL_COND_NAMED(name, cond, markers) SV_SHOW_COND(cond, ::sbpl::visual::Level::Fatal, std::string(SV_NAME_PREFIX) + "." + name, markers)
+#define SV_SHOW_FATAL_THROTTLE(rate, markers) SV_SHOW_THROTTLE(rate, ::sbpl::visual::Level::Fatal, SV_NAME_PREFIX, markers)
+#define SV_SHOW_FATAL_THROTTLE_NAMED(name, rate, markers) SV_SHOW_THROTTLE(rate, ::sbpl::visual::Level::Fatal, std::string(SV_NAME_PREFIX) + "." + name, markers)
+#define SV_SHOW_FATAL_ONCE(markers) SV_SHOW_ONCE(::sbpl::visual::Level::Fatal, SV_NAME_PREFIX, markers)
+#define SV_SHOW_FATAL_ONCE_NAMED(name, markers) SV_SHOW_ONCE(::sbpl::visual::Level::Fatal, std::string(SV_NAME_PREFIX) + "." + name, markers)
 #endif
 
 #endif

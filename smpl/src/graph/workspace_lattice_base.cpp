@@ -33,47 +33,39 @@
 
 // system includes
 #include <Eigen/Dense>
-#include <leatherman/print.h>
 
 // project includes
 #include <smpl/angles.h>
+#include <smpl/console/console.h>
 
 namespace sbpl {
 namespace motion {
 
-WorkspaceLatticeBase::WorkspaceLatticeBase(
-    RobotModel* robot,
+bool WorkspaceLatticeBase::init(
+    RobotModel* _robot,
     CollisionChecker* checker,
-    const PlanningParams* params)
-:
-    RobotPlanningSpace(robot, checker, params),
-    m_fk_iface(nullptr),
-    m_ik_iface(nullptr),
-    m_rm_iface(nullptr),
-    m_res(),
-    m_val_count(),
-    m_dof_count(0),
-    m_fangle_indices()
+    const PlanningParams* pp,
+    const Params& _params)
 {
-}
+    if (!RobotPlanningSpace::init(_robot, checker, pp)) {
+        return false;
+    }
 
-bool WorkspaceLatticeBase::init(const Params& _params)
-{
-    m_fk_iface = robot()->getExtension<ForwardKinematicsInterface>();
+    m_fk_iface = _robot->getExtension<ForwardKinematicsInterface>();
     if (!m_fk_iface) {
-        ROS_WARN("Workspace Lattice requires Forward Kinematics Interface extension");
+        SMPL_WARN("Workspace Lattice requires Forward Kinematics Interface extension");
         return false;
     }
 
-    m_ik_iface = robot()->getExtension<InverseKinematicsInterface>();
+    m_ik_iface = _robot->getExtension<InverseKinematicsInterface>();
     if (!m_ik_iface) {
-        ROS_WARN("Workspace Lattice requires Inverse Kinematics Interface extension");
+        SMPL_WARN("Workspace Lattice requires Inverse Kinematics Interface extension");
         return false;
     }
 
-    m_rm_iface = robot()->getExtension<RedundantManipulatorInterface>();
+    m_rm_iface = _robot->getExtension<RedundantManipulatorInterface>();
     if (!m_rm_iface) {
-        ROS_WARN("Workspace Lattice requires Redundant Manipulator Interface");
+        SMPL_WARN("Workspace Lattice requires Redundant Manipulator Interface");
         return false;
     }
 
@@ -108,15 +100,15 @@ bool WorkspaceLatticeBase::init(const Params& _params)
         m_val_count[6 + i] = (2.0 * M_PI) / _params.free_angle_res[i];
     }
 
-    ROS_INFO("discretization of workspace lattice:");
-    ROS_INFO("  x: { res: %0.3f, count: %d }", m_res[0], m_val_count[0]);
-    ROS_INFO("  y: { res: %0.3f, count: %d }", m_res[1], m_val_count[1]);
-    ROS_INFO("  z: { res: %0.3f, count: %d }", m_res[2], m_val_count[2]);
-    ROS_INFO("  R: { res: %0.3f, count: %d }", m_res[3], m_val_count[3]);
-    ROS_INFO("  P: { res: %0.3f, count: %d }", m_res[4], m_val_count[4]);
-    ROS_INFO("  Y: { res: %0.3f, count: %d }", m_res[5], m_val_count[5]);
+    SMPL_INFO("discretization of workspace lattice:");
+    SMPL_INFO("  x: { res: %0.3f, count: %d }", m_res[0], m_val_count[0]);
+    SMPL_INFO("  y: { res: %0.3f, count: %d }", m_res[1], m_val_count[1]);
+    SMPL_INFO("  z: { res: %0.3f, count: %d }", m_res[2], m_val_count[2]);
+    SMPL_INFO("  R: { res: %0.3f, count: %d }", m_res[3], m_val_count[3]);
+    SMPL_INFO("  P: { res: %0.3f, count: %d }", m_res[4], m_val_count[4]);
+    SMPL_INFO("  Y: { res: %0.3f, count: %d }", m_res[5], m_val_count[5]);
     for (int i = 0; i < m_fangle_indices.size(); ++i) {
-        ROS_INFO("  J%d: { res: %0.3f, count: %d }", i, m_res[6 + i], m_val_count[6 + i]);
+        SMPL_INFO("  J%d: { res: %0.3f, count: %d }", i, m_res[6 + i], m_val_count[6 + i]);
     }
 
     return true;

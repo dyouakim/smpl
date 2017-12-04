@@ -52,7 +52,6 @@ SparseDistanceMap::SparseDistanceMap(
     m_dmax_int((int)std::ceil(m_max_dist * m_inv_res)),
     m_dmax_sqrd_int(m_dmax_int * m_dmax_int),
     m_bucket(m_dmax_sqrd_int + 1),
-    m_no_update_dir(dirnum(0, 0, 0)),
     m_neighbors(),
     m_indices(),
     m_neighbor_ranges(),
@@ -146,7 +145,7 @@ void SparseDistanceMap::addPointsToMap(
 
         Cell& c = m_cells(gx, gy, gz); // force stable
         if (c.dist_new > 0) {
-            c.dir = m_no_update_dir;
+            c.dir = NO_UPDATE_DIR;
             c.dist_new = 0;
             c.obs = &c;
             c.ox = gx;
@@ -183,8 +182,8 @@ void SparseDistanceMap::removePointsFromMap(
         c.ox = c.oy = c.oz = -1;
 
         c.dist = m_dmax_sqrd_int;
-        c.dir = m_no_update_dir;
-        m_rem_stack.emplace_back(&c, gx, gy, gz);
+        c.dir = NO_UPDATE_DIR;
+        m_rem_stack.emplace_back(gx, gy, gz);
     }
 
     propagateRemovals();
@@ -237,12 +236,12 @@ void SparseDistanceMap::updatePointsInMap(
         if (c.obs != &c) {
             continue; // skip already-free cells
         }
-        c.dir = m_no_update_dir;
+        c.dir = NO_UPDATE_DIR;
         c.dist_new = m_dmax_sqrd_int;
         c.dist = m_dmax_sqrd_int;
         c.obs = nullptr;
         c.ox = c.oy = c.oz = -1;
-        m_rem_stack.emplace_back(&c, p.x(), p.y(), p.z());
+        m_rem_stack.emplace_back(p.x(), p.y(), p.z());
     }
 
     propagateRemovals();
@@ -253,7 +252,7 @@ void SparseDistanceMap::updatePointsInMap(
         if (c.dist_new == 0) {
             continue; // skip already-obstacle cells
         }
-        c.dir = m_no_update_dir;
+        c.dir = NO_UPDATE_DIR;
         c.dist_new = 0;
         c.obs = &c;
         c.ox = p.x();
@@ -279,7 +278,7 @@ void SparseDistanceMap::reset()
     initial.ox = initial.oy = initial.oz = -1;
 
     initial.bucket = -1;
-    initial.dir = m_no_update_dir;
+    initial.dir = NO_UPDATE_DIR;
 
     m_cells.reset(initial);
 }
@@ -369,7 +368,7 @@ void SparseDistanceMap::updateVertex(Cell* o, int cx, int cy, int cz)
         assert(o->bucket < m_open.size());
 
         // swap places with last element and remove from end of current bucket
-        bucket_element &e = m_open[o->bucket][o->pos];
+        bucket_element& e = m_open[o->bucket][o->pos];
         e = m_open[o->bucket].back();
         e.c->pos = o->pos;
         m_open[o->bucket].pop_back();
@@ -429,7 +428,7 @@ void SparseDistanceMap::lower(Cell* s, int sx, int sy, int sz)
 void SparseDistanceMap::raise(Cell* s, int sx, int sy, int sz)
 {
     int nfirst, nlast;
-    std::tie(nfirst, nlast) = m_neighbor_ranges[m_no_update_dir];
+    std::tie(nfirst, nlast) = m_neighbor_ranges[NO_UPDATE_DIR];
     for (int i = nfirst; i != nlast; ++i) {
         const Eigen::Vector3i& neighbor = m_neighbors[m_indices[i]];
         const Eigen::Vector3i& nx = Eigen::Vector3i(sx, sy, sz) + neighbor;
@@ -454,7 +453,7 @@ void SparseDistanceMap::waveout(Cell* n, int nx, int ny, int nz)
     n->ox = n->oy = n->oz = -1; // TODO(Andrew: required?)
 
     int nfirst, nlast;
-    std::tie(nfirst, nlast) = m_neighbor_ranges[m_no_update_dir];
+    std::tie(nfirst, nlast) = m_neighbor_ranges[NO_UPDATE_DIR];
     for (int i = nfirst; i != nlast; ++i) {
         const Eigen::Vector3i& neighbor = m_neighbors[m_indices[i]];
         const Eigen::Vector3i& ax = Eigen::Vector3i(nx, ny, nz) + neighbor;
@@ -471,13 +470,13 @@ void SparseDistanceMap::waveout(Cell* n, int nx, int ny, int nz)
                 n->ox = a->ox;
                 n->oy = a->oy;
                 n->oz = a->oz;
-                n->dir = m_no_update_dir;
+                n->dir = NO_UPDATE_DIR;
             }
         }
     }
 
     if (n->obs != obs_old) {
-//        n->dir = m_no_update_dir;
+//        n->dir = NO_UPDATE_DIR;
         updateVertex(n, nx, ny, nz);
     }
 }
@@ -507,7 +506,7 @@ void SparseDistanceMap::propagate()
 #endif
             } else {
                 s->dist = m_dmax_sqrd_int;
-                s->dir = m_no_update_dir;
+                s->dir = NO_UPDATE_DIR;
                 raise(s, e.x, e.y, e.z);
                 if (s->dist != s->dist_new) {
                     updateVertex(s, e.x, e.y, e.z);
@@ -526,12 +525,11 @@ void SparseDistanceMap::lowerBounded(Cell* s, int sx, int sy, int sz)
 void SparseDistanceMap::propagateRemovals()
 {
     while (!m_rem_stack.empty()) {
-        bucket_element e = m_rem_stack.back();
-        Cell* s = e.c;
+        GridCoord e = m_rem_stack.back();
         m_rem_stack.pop_back();
 
         int nfirst, nlast;
-        std::tie(nfirst, nlast) = m_neighbor_ranges[m_no_update_dir];
+        std::tie(nfirst, nlast) = m_neighbor_ranges[NO_UPDATE_DIR];
         for (int i = nfirst; i != nlast; ++i) {
             const Eigen::Vector3i& neighbor = m_neighbors[m_indices[i]];
             const Eigen::Vector3i& nx = Eigen::Vector3i(e.x, e.y, e.z) + neighbor;
@@ -546,8 +544,8 @@ void SparseDistanceMap::propagateRemovals()
                     n->dist = m_dmax_sqrd_int;
                     n->obs = nullptr;
                     n->ox = n->oy = n->oz = -1;
-                    n->dir = m_no_update_dir;
-                    m_rem_stack.emplace_back(n, nx.x(), nx.y(), nx.z());
+                    n->dir = NO_UPDATE_DIR;
+                    m_rem_stack.emplace_back(nx.x(), nx.y(), nx.z());
                 }
             } else {
                 updateVertex(n, nx.x(), nx.y(), nx.z());

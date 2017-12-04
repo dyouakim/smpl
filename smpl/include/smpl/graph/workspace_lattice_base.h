@@ -72,12 +72,12 @@ public:
         std::vector<double> free_angle_res;
     };
 
-    WorkspaceLatticeBase(
+    virtual bool init(
         RobotModel* robot,
         CollisionChecker* checker,
-        const PlanningParams* params);
+        const PlanningParams* pp,
+        const Params& params);
 
-    virtual bool init(const Params& _params);
     virtual bool initialized() const;
 
     const std::vector<double>& resolution() const { return m_res; }
@@ -85,13 +85,13 @@ public:
 
 protected:
 
-    ForwardKinematicsInterface* m_fk_iface;
-    InverseKinematicsInterface* m_ik_iface;
-    RedundantManipulatorInterface* m_rm_iface;
+    ForwardKinematicsInterface* m_fk_iface = nullptr;
+    InverseKinematicsInterface* m_ik_iface = nullptr;
+    RedundantManipulatorInterface* m_rm_iface = nullptr;
 
     std::vector<double> m_res;
     std::vector<int> m_val_count;
-    int m_dof_count;
+    int m_dof_count = 0;
     std::vector<std::size_t> m_fangle_indices;
 
     size_t freeAngleCount() const { return m_fangle_indices.size(); }

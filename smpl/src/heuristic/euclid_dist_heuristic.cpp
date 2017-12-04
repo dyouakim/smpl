@@ -34,14 +34,14 @@
 // standard includes
 #include <cmath>
 
-// system includes
-#include <ros/console.h>
-
 // project includes
 #include <smpl/angles.h>
+#include <smpl/console/console.h>
 
 namespace sbpl {
 namespace motion {
+
+static const char* LOG = "heuristic.euclid_dist";
 
 static inline
 double EuclideanDistance(
@@ -54,28 +54,45 @@ double EuclideanDistance(
     return std::sqrt(dx * dx + dy * dy + dz * dz);
 }
 
-EuclidDistHeuristic::EuclidDistHeuristic(
-    const RobotPlanningSpacePtr& pspace,
-    const OccupancyGrid* grid)
-:
-    RobotHeuristic(pspace, grid)
+bool EuclidDistHeuristic::init(RobotPlanningSpace* space)
 {
-    m_point_ext = pspace->getExtension<PointProjectionExtension>();
-    if (m_point_ext) {
-        ROS_INFO_NAMED(params()->heuristic_log, "Got Point Projection Extension!");
-    }
-    m_pose_ext = pspace->getExtension<PoseProjectionExtension>();
-    if (m_pose_ext) {
-        ROS_INFO_NAMED(params()->heuristic_log, "Got Pose Projection Extension!");
-    }
-    if (!m_pose_ext && !m_point_ext) {
-        ROS_WARN_NAMED(params()->heuristic_log, "EuclidDistHeuristic recommends PointProjectionExtension or PoseProjectionExtension");
+    if (!RobotHeuristic::init(space)) {
+        return false;
     }
 
-    params()->param("x_coeff", m_x_coeff, 1.0);
-    params()->param("y_coeff", m_y_coeff, 1.0);
-    params()->param("z_coeff", m_z_coeff, 1.0);
-    params()->param("rot_coeff", m_rot_coeff, 1.0);
+    m_point_ext = space->getExtension<PointProjectionExtension>();
+    if (m_point_ext) {
+        SMPL_INFO_NAMED(LOG, "Got Point Projection Extension!");
+    }
+    m_pose_ext = space->getExtension<PoseProjectionExtension>();
+    if (m_pose_ext) {
+        SMPL_INFO_NAMED(LOG, "Got Pose Projection Extension!");
+    }
+    if (!m_pose_ext && !m_point_ext) {
+        SMPL_WARN_NAMED(LOG, "EuclidDistHeuristic recommends PointProjectionExtension or PoseProjectionExtension");
+    }
+
+    return true;
+}
+
+void EuclidDistHeuristic::setWeightX(double wx)
+{
+    m_x_coeff = wx;
+}
+
+void EuclidDistHeuristic::setWeightY(double wy)
+{
+    m_y_coeff = wy;
+}
+
+void EuclidDistHeuristic::setWeightZ(double wz)
+{
+    m_z_coeff = wz;
+}
+
+void EuclidDistHeuristic::setWeightRot(double wr)
+{
+    m_rot_coeff = wr;
 }
 
 double EuclidDistHeuristic::getMetricGoalDistance(double x, double y, double z)
@@ -119,7 +136,7 @@ int EuclidDistHeuristic::GetGoalHeuristic(int state_id)
 
         double Y, P, R;
         angles::get_euler_zyx(p.rotation(), Y, P, R);
-        ROS_DEBUG_NAMED(params()->heuristic_log, "h(%0.3f, %0.3f, %0.3f, %0.3f, %0.3f, %0.3f) = %d", p.translation()[0], p.translation()[1], p.translation()[2], Y, P, R, h);
+        SMPL_DEBUG_NAMED(LOG, "h(%0.3f, %0.3f, %0.3f, %0.3f, %0.3f, %0.3f) = %d", p.translation()[0], p.translation()[1], p.translation()[2], Y, P, R, h);
 
         return h;
     } else if (m_point_ext) {
@@ -134,7 +151,7 @@ int EuclidDistHeuristic::GetGoalHeuristic(int state_id)
         double dist = computeDistance(p, gp);
 
         const int h = FIXED_POINT_RATIO * dist;
-        ROS_DEBUG_NAMED(params()->heuristic_log, "h(%d) = %d", state_id, h);
+        SMPL_DEBUG_NAMED(LOG, "h(%d) = %d", state_id, h);
         return h;
     } else {
         return 0;
@@ -249,7 +266,7 @@ double EuclidDistHeuristic::computeDistance(
     double dr2 = angles::normalize_angle(2.0 * std::acos(dot));
     dr2 *= (m_rot_coeff * dr2);
 
-    ROS_DEBUG_NAMED(params()->heuristic_log, "Compute Distance: sqrt(%f + %f)", dp2, dr2);
+    SMPL_DEBUG_NAMED(LOG, "Compute Distance: sqrt(%f + %f)", dp2, dr2);
 
     return std::sqrt(dp2 + dr2);
 }

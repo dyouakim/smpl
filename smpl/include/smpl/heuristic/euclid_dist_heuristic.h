@@ -42,9 +42,12 @@ class EuclidDistHeuristic : public RobotHeuristic
 {
 public:
 
-    EuclidDistHeuristic(
-        const RobotPlanningSpacePtr& pspace,
-        const OccupancyGrid* grid);
+    bool init(RobotPlanningSpace* space);
+
+    void setWeightX(double wx);
+    void setWeightY(double wy);
+    void setWeightZ(double wz);
+    void setWeightRot(double wr);
 
     /// \name Required Public Functions from RobotHeuristic
     ///@{
@@ -68,13 +71,13 @@ private:
 
     static constexpr double FIXED_POINT_RATIO = 1000.0;
 
-    PoseProjectionExtension* m_pose_ext;
-    PointProjectionExtension* m_point_ext;
+    PoseProjectionExtension* m_pose_ext = nullptr;
+    PointProjectionExtension* m_point_ext = nullptr;
 
-    double m_x_coeff;
-    double m_y_coeff;
-    double m_z_coeff;
-    double m_rot_coeff;
+    double m_x_coeff = 1.0;
+    double m_y_coeff = 1.0;
+    double m_z_coeff = 1.0;
+    double m_rot_coeff = 1.0;
 
     Eigen::Affine3d createPose(const std::vector<double>& pose) const;
     Eigen::Vector3d createPoint(const std::vector<double>& point) const;

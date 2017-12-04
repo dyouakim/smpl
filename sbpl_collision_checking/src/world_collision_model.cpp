@@ -45,7 +45,7 @@
 #include <octomap_msgs/conversions.h>
 
 // project includes
-#include "voxel_operations.h"
+#include <sbpl_collision_checking/voxel_operations.h>
 #include "collision_operations.h"
 
 namespace sbpl {

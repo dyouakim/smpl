@@ -41,19 +41,25 @@
 #include <sbpl_collision_checking/collision_space.h>
 #include <smpl/ros/propagation_distance_field.h>
 #include <visualization_msgs/MarkerArray.h>
+#include <smpl/debug/visualize.h>
+#include <smpl/debug/visualizer_ros.h>
 
 int main(int argc, char **argv)
 {
     ros::init(argc, argv, "sbpl_collision_space_test");
     ros::NodeHandle nh;
-    double dist = 0;
-    ros::Publisher p = nh.advertise<visualization_msgs::MarkerArray>(
-            "visualization_marker_array", 500, true);
+
+    sbpl::VisualizerROS visualizer;
+    sbpl::visual::set_visualizer(&visualizer);
+
     ros::NodeHandle ph("~");
-    sleep(1);
-    std::string group_name, world_frame;
-    std::vector<double> dims(3, 0.0), origin(3, 0.0);
+
+    std::string group_name;
+    std::string world_frame;
+    double dims[3];
+    double origin[3];
     std::vector<std::string> joint_names(7);
+
     ph.param<std::string>("group_name", group_name, "");
     ph.param<std::string>("world_frame", world_frame, "");
     ph.param("dims/x", dims[0], 2.0);
@@ -70,16 +76,17 @@ int main(int argc, char **argv)
     ph.param<std::string>("joint_5", joint_names[5], "");
     ph.param<std::string>("joint_6", joint_names[6], "");
 
-    // remove empty joint names (for arms with fewer than 7 joints)
-    for (size_t i = 0; i < joint_names.size(); ++i) {
-        if(joint_names[i].empty())
-        joint_names.erase(joint_names.begin()+i);
-    }
+    auto rit = std::remove_if(
+            begin(joint_names), end(joint_names),
+            [](const std::string& name) { return name.empty(); });
+    joint_names.erase(rit, end(joint_names));
+
     if (joint_names.empty()) {
         ROS_ERROR("No planning joints found on param server.");
         return 0;
     }
-    ROS_INFO("Retrieved %d planning joints from param server.", int(joint_names.size()));
+
+    ROS_INFO("Retrieved %zu planning joints from param server.", joint_names.size());
 
     const double res = 0.02;
     const double max_distance = 0.4;
@@ -88,10 +95,9 @@ int main(int argc, char **argv)
             dims[0], dims[1], dims[2],
             res,
             max_distance);
-    df->reset();
 
-    sbpl::OccupancyGridPtr grid = std::make_shared<sbpl::OccupancyGrid>(df);
-    grid->setReferenceFrame(world_frame);
+    sbpl::OccupancyGrid grid(df);
+    grid.setReferenceFrame(world_frame);
 
     std::string urdf_string;
     if (!nh.getParam("robot_description", urdf_string)) {
@@ -100,22 +106,24 @@ int main(int argc, char **argv)
     }
 
     sbpl::collision::CollisionModelConfig cspace_config;
-    sbpl::collision::CollisionModelConfig::Load(ros::NodeHandle(), cspace_config);
+    if (!sbpl::collision::CollisionModelConfig::Load(ros::NodeHandle(), cspace_config)) {
+        ROS_ERROR("Failed to load Collision Model Config");
+        return 1;
+    }
 
-    sbpl::collision::CollisionSpaceBuilder builder;
-    auto cspace = builder.build(
-            grid.get(), urdf_string, cspace_config, group_name, joint_names);
-    if (!cspace) {
-        return false;
+    sbpl::collision::CollisionSpace cspace;
+    if (!cspace.init(&grid, urdf_string, cspace_config, group_name, joint_names)) {
+        ROS_ERROR("Failed to initialize Collision Space");
+        return 1;
     }
 
     ROS_INFO("Initialized the collision space.");
 
     // add robot's pose in map
-    moveit_msgs::PlanningScenePtr scene(new moveit_msgs::PlanningScene);
-    scene->world.octomap.header.frame_id = world_frame;
-    scene->robot_state.multi_dof_joint_state.header.frame_id = "base_link";
-    scene->robot_state.multi_dof_joint_state.joint_names.push_back("torso_lift_link");
+    moveit_msgs::PlanningScene scene;
+    scene.world.octomap.header.frame_id = world_frame;
+    scene.robot_state.multi_dof_joint_state.header.frame_id = "base_link";
+    scene.robot_state.multi_dof_joint_state.joint_names.push_back("torso_lift_link");
 
     geometry_msgs::Transform t;
     t.translation.x = -0.06;
@@ -123,15 +131,15 @@ int main(int argc, char **argv)
     t.translation.z = 0.34;
     t.rotation.w = 1.0;
     t.rotation.x = t.rotation.y = t.rotation.z = 0.0;
-    scene->robot_state.multi_dof_joint_state.transforms.push_back(t);
+    scene.robot_state.multi_dof_joint_state.transforms.push_back(t);
 
-    scene->robot_state.joint_state.name.push_back("right_gripper_finger_joint");
-    scene->robot_state.joint_state.name.push_back("left_gripper_finger_joint");
-    scene->robot_state.joint_state.position.push_back(0.08);
-    scene->robot_state.joint_state.position.push_back(0.08);
-    cspace->setPlanningScene(*scene);
+    scene.robot_state.joint_state.name.push_back("right_gripper_finger_joint");
+    scene.robot_state.joint_state.name.push_back("left_gripper_finger_joint");
+    scene.robot_state.joint_state.position.push_back(0.08);
+    scene.robot_state.joint_state.position.push_back(0.08);
+    cspace.setPlanningScene(scene);
 
-    std::vector<double> angles(7,0);
+    std::vector<double> angles(7, 0.0);
     angles[0] = -0.7;
     angles[1] = 0.3;
     angles[2] = 0.0;
@@ -141,15 +149,10 @@ int main(int argc, char **argv)
     angles[6] = 0.4;
 
     ros::spinOnce();
-    p.publish(cspace->getVisualization("distance_field"));
-    p.publish(cspace->getVisualization("bounds"));
-    //ma_pub.publish(planner->getVisualization("bfs_walls"));
-    //ma_pub.publish(planner->getVisualization("bfs_values"));
-    //ma_pub.publish(planner->getVisualization("goal"));
-    //ma_pub.publish(planner->getVisualization("expansions"));
-    p.publish(cspace->getVisualization("collision_objects"));
-    p.publish(cspace->getVisualization("occupied_voxels"));
-    p.publish(cspace->getCollisionModelVisualization(angles));
+    SV_SHOW_INFO(cspace.getBoundingBoxVisualization());
+    SV_SHOW_INFO(cspace.getOccupiedVoxelsVisualization());
+    SV_SHOW_INFO(cspace.getDistanceFieldVisualization());
+    SV_SHOW_INFO(cspace.getCollisionModelVisualization(angles));
 
     ros::spinOnce();
     sleep(1);

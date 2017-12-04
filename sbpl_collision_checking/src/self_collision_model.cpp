@@ -64,14 +64,14 @@ public:
     void setWorldToModelTransform(const Eigen::Affine3d& transform);
 
     bool checkCollision(
-        RobotCollisionState& state,
-        AttachedBodiesCollisionState& ab_state,
+        const RobotCollisionState& state,
+        const AttachedBodiesCollisionState& ab_state,
         const int gidx,
         double& dist);
 
     bool checkCollision(
-        RobotCollisionState& state,
-        AttachedBodiesCollisionState& ab_state,
+        const RobotCollisionState& state,
+        const AttachedBodiesCollisionState& ab_state,
         const AllowedCollisionsInterface& aci,
         const int gidx,
         double& dist);
@@ -96,25 +96,25 @@ public:
         double& dist);
 
     double collisionDistance(
-        RobotCollisionState& state,
-        AttachedBodiesCollisionState& ab_state,
+        const RobotCollisionState& state,
+        const AttachedBodiesCollisionState& ab_state,
         const int gidx);
 
     double collisionDistance(
-        RobotCollisionState& state,
-        AttachedBodiesCollisionState& ab_state,
+        const RobotCollisionState& state,
+        const AttachedBodiesCollisionState& ab_state,
         const AllowedCollisionsInterface& aci,
         const int gidx);
 
     bool collisionDetails(
-        RobotCollisionState& state,
-        AttachedBodiesCollisionState& ab_state,
+        const RobotCollisionState& state,
+        const AttachedBodiesCollisionState& ab_state,
         const int gidx,
         CollisionDetails& details);
 
     bool collisionDetails(
-        RobotCollisionState& state,
-        AttachedBodiesCollisionState& ab_state,
+        const RobotCollisionState& state,
+        const AttachedBodiesCollisionState& ab_state,
         const AllowedCollisionsInterface& aci,
         const int gidx,
         CollisionDetails& details);
@@ -405,8 +405,8 @@ void SelfCollisionModelImpl::setWorldToModelTransform(
 }
 
 bool SelfCollisionModelImpl::checkCollision(
-    RobotCollisionState& state,
-    AttachedBodiesCollisionState& ab_state,
+    const RobotCollisionState& state,
+    const AttachedBodiesCollisionState& ab_state,
     const int gidx,
     double& dist)
 {
@@ -428,8 +428,8 @@ bool SelfCollisionModelImpl::checkCollision(
 }
 
 bool SelfCollisionModelImpl::checkCollision(
-    RobotCollisionState& state,
-    AttachedBodiesCollisionState& ab_state,
+    const RobotCollisionState& state,
+    const AttachedBodiesCollisionState& ab_state,
     const AllowedCollisionsInterface& aci,
     const int gidx,
     double& dist)
@@ -501,8 +501,8 @@ bool SelfCollisionModelImpl::checkMotionCollision(
 }
 
 double SelfCollisionModelImpl::collisionDistance(
-    RobotCollisionState& state,
-    AttachedBodiesCollisionState& ab_state,
+    const RobotCollisionState& state,
+    const AttachedBodiesCollisionState& ab_state,
     const int gidx)
 {
     if (!checkCommonInputs(state, ab_state, gidx)) {
@@ -531,8 +531,8 @@ double SelfCollisionModelImpl::collisionDistance(
 }
 
 double SelfCollisionModelImpl::collisionDistance(
-    RobotCollisionState& state,
-    AttachedBodiesCollisionState& ab_state,
+    const RobotCollisionState& state,
+    const AttachedBodiesCollisionState& ab_state,
     const AllowedCollisionsInterface& aci,
     const int gidx)
 {
@@ -562,8 +562,8 @@ double SelfCollisionModelImpl::collisionDistance(
 }
 
 bool SelfCollisionModelImpl::collisionDetails(
-    RobotCollisionState& state,
-    AttachedBodiesCollisionState& ab_state,
+    const RobotCollisionState& state,
+    const AttachedBodiesCollisionState& ab_state,
     const int gidx,
     CollisionDetails& details)
 {
@@ -584,8 +584,8 @@ bool SelfCollisionModelImpl::collisionDetails(
 }
 
 bool SelfCollisionModelImpl::collisionDetails(
-    RobotCollisionState& state,
-    AttachedBodiesCollisionState& ab_state,
+    const RobotCollisionState& state,
+    const AttachedBodiesCollisionState& ab_state,
     const AllowedCollisionsInterface& aci,
     const int gidx,
     CollisionDetails& details)
@@ -1807,8 +1807,8 @@ void SelfCollisionModel::setWorldToModelTransform(const Eigen::Affine3d& transfo
 }
 
 bool SelfCollisionModel::checkCollision(
-    RobotCollisionState& state,
-    AttachedBodiesCollisionState& ab_state,
+    const RobotCollisionState& state,
+    const AttachedBodiesCollisionState& ab_state,
     const int gidx,
     double& dist)
 {
@@ -1816,8 +1816,8 @@ bool SelfCollisionModel::checkCollision(
 }
 
 bool SelfCollisionModel::checkCollision(
-    RobotCollisionState& state,
-    AttachedBodiesCollisionState& ab_state,
+    const RobotCollisionState& state,
+    const AttachedBodiesCollisionState& ab_state,
     const AllowedCollisionsInterface& aci,
     const int gidx,
     double& dist)
@@ -1851,16 +1851,16 @@ bool SelfCollisionModel::checkMotionCollision(
 }
 
 double SelfCollisionModel::collisionDistance(
-    RobotCollisionState& state,
-    AttachedBodiesCollisionState& ab_state,
+    const RobotCollisionState& state,
+    const AttachedBodiesCollisionState& ab_state,
     const int gidx)
 {
     return m_impl->collisionDistance(state, ab_state, gidx);
 }
 
 double SelfCollisionModel::collisionDistance(
-    RobotCollisionState& state,
-    AttachedBodiesCollisionState& ab_state,
+    const RobotCollisionState& state,
+    const AttachedBodiesCollisionState& ab_state,
     const AllowedCollisionsInterface& aci,
     const int gidx)
 {
@@ -1868,8 +1868,8 @@ double SelfCollisionModel::collisionDistance(
 }
 
 bool SelfCollisionModel::collisionDetails(
-    RobotCollisionState& state,
-    AttachedBodiesCollisionState& ab_state,
+    const RobotCollisionState& state,
+    const AttachedBodiesCollisionState& ab_state,
     const int gidx,
     CollisionDetails& details)
 {
@@ -1877,8 +1877,8 @@ bool SelfCollisionModel::collisionDetails(
 }
 
 bool SelfCollisionModel::collisionDetails(
-    RobotCollisionState& state,
-    AttachedBodiesCollisionState& ab_state,
+    const RobotCollisionState& state,
+    const AttachedBodiesCollisionState& ab_state,
     const AllowedCollisionsInterface& aci,
     const int gidx,
     CollisionDetails& details)

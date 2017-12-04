@@ -583,7 +583,7 @@ bool SparseGrid<T, Allocator>::prune(node_type* n, UnaryPredicate p)
             return false;
         }
     } else {
-        return true;
+        return p(n->value);
     }
 }
 

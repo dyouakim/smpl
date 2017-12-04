@@ -32,6 +32,10 @@
 #ifndef SMPL_ARASTAR_H
 #define SMPL_ARASTAR_H
 
+// standard includes
+#include <assert.h>
+#include <algorithm>
+
 // system includes
 #include <sbpl/heuristics/heuristic.h>
 #include <sbpl/planners/planner.h>
@@ -91,14 +95,41 @@ public:
     ARAStar(DiscreteSpaceInformation* space, Heuristic* heuristic);
     ~ARAStar();
 
-    void allowPartialSolutions(bool enabled) { m_allow_partial_solutions = enabled; }
+    void allowPartialSolutions(bool enabled) {
+        m_allow_partial_solutions = enabled;
+    }
+
     bool allowPartialSolutions() const { return m_allow_partial_solutions; }
 
-    void setAllowedRepairTime(double allowed_time_secs)
-    { m_time_params.max_allowed_time = to_duration(allowed_time_secs); }
+    void setAllowedRepairTime(double allowed_time_secs) {
+        m_time_params.max_allowed_time = to_duration(allowed_time_secs);
+    }
 
-    double allowedRepairTime() const
-    { return to_seconds(m_time_params.max_allowed_time); }
+    double allowedRepairTime() const {
+        return to_seconds(m_time_params.max_allowed_time);
+    }
+
+    void setTargetEpsilon(double target_eps) {
+        m_final_eps = std::max(target_eps, 1.0);
+    }
+
+    double targetEpsilon() const { return m_final_eps; }
+
+    void setDeltaEpsilon(double delta_eps) {
+        assert(delta_eps > 0.0);
+        m_delta_eps = delta_eps;
+    }
+
+    double deltaEpsilon() const { return m_delta_eps; }
+
+    void setImproveSolution(bool improve) {
+        m_time_params.improve = improve;
+    }
+
+    bool improveSolution() const { return m_time_params.improve; }
+
+    void setBoundExpansions(bool bound) { m_time_params.bounded = bound; }
+    bool boundExpansions() const { return m_time_params.bounded; }
 
     int replan(
         const TimeParameters &params,
@@ -170,16 +201,15 @@ private:
     int m_start_state_id;   // graph state id for the start state
     int m_goal_state_id;    // graph state id for the goal state
 
-    // map from graph state id to search state id, incrementally expanded
-    // as states are encountered during the search
-    std::vector<int> m_graph_to_search_map;
-
     // search state (not including the values of g, f, back pointers, and
     // closed list from m_stats)
     intrusive_heap<SearchState, SearchStateCompare> m_open;
     std::vector<SearchState*> m_incons;
     double m_curr_eps;
     int m_iteration;
+
+    std::vector<int> m_succs;
+    std::vector<int> m_costs;
 
     int m_call_number;          // for lazy reinitialization of search states
     int m_last_start_state_id;  // for lazy reinitialization of the search tree

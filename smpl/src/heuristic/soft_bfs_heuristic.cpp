@@ -31,6 +31,8 @@
 
 #include <smpl/heuristic/soft_bfs_heuristic.h>
 
+#include <smpl/console/console.h>
+
 namespace sbpl {
 namespace motion {
 
@@ -50,14 +52,14 @@ bool SoftBfsHeuristic::setGoal(int x, int y, int z)
     m_grid->worldToGrid(x, y, z, gx, gy, gz);
 
     if (!m_bfs->escapeCell(x, y, z)) {
-        ROS_ERROR("BFS goal is out of bounds or couldn't be freed");
+        SMPL_ERROR("BFS goal is out of bounds or couldn't be freed");
         return false;
     }
 
     m_bfs->run_components(x, y, z);
-    ROS_INFO(" -> Running");
+    SMPL_INFO(" -> Running");
     while (m_bfs->isRunning());
-    ROS_INFO(" -> Finished: %d walls, %d undiscovered, %d discovered", m_bfs->countWalls(), m_bfs->countUndiscovered(), m_bfs->countDiscovered());
+    SMPL_INFO(" -> Finished: %d walls, %d undiscovered, %d discovered", m_bfs->countWalls(), m_bfs->countUndiscovered(), m_bfs->countDiscovered());
 
     return true;
 }
@@ -83,7 +85,7 @@ int SoftBfsHeuristic::GetGoalHeuristic(int state_id)
         else {
             int cell_dist = m_bfs->getDistance(x, y, z);
             if (cell_dist < 0) {
-                ROS_WARN_THROTTLE(1, "queried distance for isolated cell");
+                SMPL_WARN_THROTTLE(1, "queried distance for isolated cell");
                 m_bfs->setWall(x, y, z);
                 while ((cell_dist = m_bfs->getNearestFreeNodeDist(x, y, z)) < 0);
                 return 100 * cell_dist;
@@ -139,7 +141,7 @@ void SoftBfsHeuristic::syncGridAndBfs()
         }
     }
 
-    ROS_INFO("%d/%d (%0.3f%%) walls in the bfs heuristic", wall_count, cell_count, 100.0 * (double)wall_count / cell_count);
+    SMPL_INFO("%d/%d (%0.3f%%) walls in the bfs heuristic", wall_count, cell_count, 100.0 * (double)wall_count / cell_count);
 }
 
 } // namespace motion

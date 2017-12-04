@@ -32,9 +32,6 @@
 
 #include <smpl/collision_checker.h>
 
-// system includes
-#include <ros/console.h>
-
 namespace sbpl {
 namespace motion {
 
@@ -46,18 +43,10 @@ CollisionChecker::~CollisionChecker()
 {
 }
 
-visualization_msgs::MarkerArray
-CollisionChecker::getCollisionModelVisualization(const RobotState& state)
+auto CollisionChecker::getCollisionModelVisualization(const RobotState& state)
+    -> std::vector<visual::Marker>
 {
-    ROS_ERROR("Function is not filled in.");
-    return visualization_msgs::MarkerArray();
-}
-
-visualization_msgs::MarkerArray
-CollisionChecker::getVisualization(const std::string& type)
-{
-    ROS_ERROR("Function is not filled in.");
-    return visualization_msgs::MarkerArray();
+    return { };
 }
 
 } // namespace motion

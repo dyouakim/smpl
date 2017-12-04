@@ -33,10 +33,11 @@
 #ifndef SMPL_PLANNING_PARAMS_H
 #define SMPL_PLANNING_PARAMS_H
 
-// standard includes
 #include <stdexcept>
 #include <string>
 #include <unordered_map>
+
+#include <boost/variant.hpp>
 
 namespace sbpl {
 namespace motion {
@@ -58,68 +59,7 @@ struct ParameterException : public std::runtime_error
     ParameterException(const char* what) : std::runtime_error(what) { }
 };
 
-struct Parameter
-{
-    enum Type
-    {
-        Invalid = 0,
-        Bool    = 1,
-        Int     = 2,
-        Double  = 3,
-        String  = 4,
-    };
-
-    Type type() const { return m_type; }
-
-    Parameter() : m_type(Invalid), m_value() { }
-
-    Parameter(bool value) : m_type(Bool) { m_value.asBool = value; }
-    Parameter(int value) : m_type(Int) { m_value.asInt = value; }
-    Parameter(double value) : m_type(Double) { m_value.asDouble = value; }
-
-    Parameter(const std::string& value) : m_type(String)
-    { m_value.asString = new std::string(value); }
-
-    Parameter(const char* value) : m_type(String)
-    { m_value.asString = new std::string(value); }
-
-    Parameter(const Parameter& o);
-
-    Parameter& operator=(const Parameter& value);
-    Parameter& operator=(bool value);
-    Parameter& operator=(int value);
-    Parameter& operator=(double value);
-    Parameter& operator=(const std::string &value);
-    Parameter& operator=(const char* value);
-
-    ~Parameter();
-
-    operator bool&();
-    operator int&();
-    operator double&();
-    operator std::string&();
-
-    operator const bool&() const;
-    operator const int&() const;
-    operator const double&() const;
-    operator const std::string&() const;
-
-private:
-
-    Type m_type;
-
-    union
-    {
-        bool            asBool;
-        int             asInt;
-        double          asDouble;
-        std::string*    asString;
-    } m_value;
-
-    bool isDynamic() const { return m_type == Type::String; }
-    void destroy();
-    void copy(const Parameter& o);
-};
+using Parameter = boost::variant<bool, int, double, std::string>;
 
 class PlanningParams
 {

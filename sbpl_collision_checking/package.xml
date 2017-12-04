@@ -22,6 +22,7 @@
     <depend>octomap_msgs</depend>
     <depend>roscpp</depend>
     <depend>smpl</depend>
+    <depend>smpl_ros</depend>
     <depend>sensor_msgs</depend>
     <depend>shape_msgs</depend>
     <depend>tf_conversions</depend>

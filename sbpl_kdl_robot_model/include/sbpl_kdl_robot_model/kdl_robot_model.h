@@ -30,8 +30,8 @@
 /// \author Benjamin Cohen
 /// \author Andrew Dornbush
 
-#ifndef sbpl_manip_kdl_robot_model_h
-#define sbpl_manip_kdl_robot_model_h
+#ifndef SBPL_KDL_ROBOT_MODEL_KDL_ROBOT_MODEL_H
+#define SBPL_KDL_ROBOT_MODEL_KDL_ROBOT_MODEL_H
 
 // standard includes
 #include <memory>
@@ -45,7 +45,7 @@
 #include <kdl/chainiksolvervel_pinv.hpp>
 #include <kdl/frames.hpp>
 #include <kdl/jntarray.hpp>
-#include <kdl_parser/kdl_parser.hpp>
+#include <kdl/tree.hpp>
 #include <ros/console.h>
 #include <smpl/robot_model.h>
 #include <urdf/model.h>

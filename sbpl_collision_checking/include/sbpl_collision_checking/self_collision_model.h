@@ -75,14 +75,14 @@ public:
     void setWorldToModelTransform(const Eigen::Affine3d& transform);
 
     bool checkCollision(
-        RobotCollisionState& state,
-        AttachedBodiesCollisionState& ab_state,
+        const RobotCollisionState& state,
+        const AttachedBodiesCollisionState& ab_state,
         const int gidx,
         double& dist);
 
     bool checkCollision(
-        RobotCollisionState& state,
-        AttachedBodiesCollisionState& ab_state,
+        const RobotCollisionState& state,
+        const AttachedBodiesCollisionState& ab_state,
         const AllowedCollisionsInterface& aci,
         const int gidx,
         double& dist);
@@ -107,25 +107,25 @@ public:
         double& dist);
 
     double collisionDistance(
-        RobotCollisionState& state,
-        AttachedBodiesCollisionState& ab_state,
+        const RobotCollisionState& state,
+        const AttachedBodiesCollisionState& ab_state,
         const int gidx);
 
     double collisionDistance(
-        RobotCollisionState& state,
-        AttachedBodiesCollisionState& ab_state,
+        const RobotCollisionState& state,
+        const AttachedBodiesCollisionState& ab_state,
         const AllowedCollisionsInterface& aci,
         const int gidx);
 
     bool collisionDetails(
-        RobotCollisionState& state,
-        AttachedBodiesCollisionState& ab_state,
+        const RobotCollisionState& state,
+        const AttachedBodiesCollisionState& ab_state,
         const int gidx,
         CollisionDetails& details);
 
     bool collisionDetails(
-        RobotCollisionState& state,
-        AttachedBodiesCollisionState& ab_state,
+        const RobotCollisionState& state,
+        const AttachedBodiesCollisionState& ab_state,
         const AllowedCollisionsInterface& aci,
         const int gidx,
         CollisionDetails& details);

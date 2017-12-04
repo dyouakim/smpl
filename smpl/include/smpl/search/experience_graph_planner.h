@@ -49,9 +49,7 @@ class ExperienceGraphPlanner : public SBPLPlanner
 {
 public:
 
-    ExperienceGraphPlanner(
-        const RobotPlanningSpacePtr& pspace,
-        const RobotHeuristicPtr& heur);
+    ExperienceGraphPlanner(RobotPlanningSpace* pspace, RobotHeuristic* heur);
 
     ~ExperienceGraphPlanner();
 
@@ -103,10 +101,10 @@ private:
         }
     };
 
-    RobotPlanningSpacePtr m_pspace;
+    RobotPlanningSpace* m_space;
     ExperienceGraphExtension* m_ege;
 
-    RobotHeuristicPtr m_heur;
+    RobotHeuristic* m_heur;
     ExperienceGraphHeuristicExtension* m_egh;
 
     std::vector<SearchState*> m_states;

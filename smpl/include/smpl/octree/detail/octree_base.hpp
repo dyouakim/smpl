@@ -108,7 +108,7 @@ OcTreeBase<T, Allocator>::destroy_children(node_type *n)
 {
     node_type* nit = n->children;
     node_type* nend = nit + 8;
-    for (nit; nit != nend; ++nit) {
+    for (; nit != nend; ++nit) {
         destroy_node(nit);
     }
 }

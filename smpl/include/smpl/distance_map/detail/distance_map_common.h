@@ -52,7 +52,7 @@ static const int NEIGHBOR_LIST_SIZE =
 /// Return the index into a 27-connected neighbors array for a given direction.
 /// The index is offset by 27 if edge is 1
 inline
-int dirnum(int dx, int dy, int dz, int edge = 0)
+constexpr int dirnum(int dx, int dy, int dz, int edge = 0)
 {
     return 27 * edge + 9 * (dx + 1) + 3 * (dy + 1) + (dz + 1);
 }

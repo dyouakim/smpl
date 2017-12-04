@@ -35,29 +35,32 @@
 // standard includes
 #include <memory>
 
-// system includes
-#include <visualization_msgs/MarkerArray.h>
-
 // project includes
+#include <smpl/occupancy_grid.h>
+#include <smpl/debug/marker.h>
 #include <smpl/heuristic/robot_heuristic.h>
+#include <smpl/bfs3d/bfs3d.h>
 
 namespace sbpl {
 namespace motion {
-
-class BFS_3D;
 
 class MultiFrameBfsHeuristic : public RobotHeuristic
 {
 public:
 
-    MultiFrameBfsHeuristic(
-        const RobotPlanningSpacePtr& pspace,
-        const OccupancyGrid* grid);
-
     virtual ~MultiFrameBfsHeuristic();
 
-    visualization_msgs::MarkerArray getWallsVisualization() const;
-    visualization_msgs::MarkerArray getValuesVisualization() const;
+    bool init(RobotPlanningSpace* space, const OccupancyGrid* grid);
+
+    double inflationRadius() const { return m_inflation_radius; }
+    void setInflationRadius(double radius);
+    int costPerCell() const { return m_cost_per_cell; }
+    void setCostPerCell(int cost);
+
+    auto grid() const -> const OccupancyGrid* { return m_grid; }
+
+    auto getWallsVisualization() const -> visual::Marker;
+    auto getValuesVisualization() const -> visual::Marker;
 
     /// \name Required Public Functions from RobotHeuristic
     ///@{
@@ -84,12 +87,17 @@ public:
 
 private:
 
-    PointProjectionExtension* m_pp;
-    ExtractRobotStateExtension* m_ers;
-    ForwardKinematicsInterface* m_fk_iface;
+    const OccupancyGrid* m_grid = nullptr;
+
+    PointProjectionExtension* m_pp = nullptr;
+    ExtractRobotStateExtension* m_ers = nullptr;
+    ForwardKinematicsInterface* m_fk_iface = nullptr;
 
     std::unique_ptr<BFS_3D> m_bfs;
     std::unique_ptr<BFS_3D> m_ee_bfs;
+
+    double m_inflation_radius = 0.0;
+    int m_cost_per_cell = 1;
 
     int getGoalHeuristic(int state_id, bool use_ee) const;
 

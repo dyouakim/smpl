@@ -1,0 +1,21 @@
+<package format="2">
+    <name>smpl_ros</name>
+    <version>0.0.0</version>
+    <description>ROS Extensions and Wrappers around the SMPL Library</description>
+    <author email="bcohen@seas.upenn.edu">Benjamin Cohen</author>
+    <author email="andrew.dornbush@gmail.com">Andrew Dornbush</author>
+    <maintainer email="andrew.dornbush@gmail.com">Andrew Dornbush</maintainer>
+    <license>BSD</license>
+
+    <buildtool_depend>catkin</buildtool_depend>
+
+    <depend>boost</depend>
+    <depend>eigen</depend>
+    <depend>leatherman</depend>
+    <depend>moveit_core</depend>
+    <depend>moveit_msgs</depend>
+    <depend>roscpp</depend>
+    <depend>smpl</depend>
+    <depend>trajectory_msgs</depend>
+    <depend>visualization_msgs</depend>
+</package>

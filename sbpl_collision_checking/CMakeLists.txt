@@ -20,6 +20,7 @@ find_package(catkin
         octomap_msgs
         roscpp
         smpl
+        smpl_ros
         sensor_msgs
         shape_msgs
         tf_conversions
@@ -45,6 +46,7 @@ catkin_package(
         octomap_msgs
         roscpp
         smpl
+        smpl_ros
         sensor_msgs
         shape_msgs
         tf_conversions
@@ -57,10 +59,10 @@ catkin_package(
 
 add_definitions(-DROSCONSOLE_MIN_SEVERITY=ROSCONSOLE_SEVERITY_INFO)
 
-include_directories(${Boost_INCLUDE_DIRS})
-include_directories(${Eigen_INCLUDE_DIRS})
-include_directories(${catkin_INCLUDE_DIRS})
-include_directories(${OCTOMAP_INCLUDE_DIRS})
+include_directories(SYSTEM ${Boost_INCLUDE_DIRS})
+include_directories(SYSTEM ${Eigen_INCLUDE_DIRS})
+include_directories(SYSTEM ${catkin_INCLUDE_DIRS})
+include_directories(SYSTEM ${OCTOMAP_INCLUDE_DIRS})
 include_directories(include)
 
 add_library(

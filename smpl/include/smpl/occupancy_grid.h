@@ -41,11 +41,11 @@
 // system includes
 #include <Eigen/Dense>
 #include <Eigen/StdVector>
-#include <visualization_msgs/MarkerArray.h>
 
 // project includes
-#include <smpl/distance_map/distance_map_interface.h>
 #include <smpl/forward.h>
+#include <smpl/debug/marker.h>
+#include <smpl/distance_map/distance_map_interface.h>
 
 namespace sbpl {
 
@@ -65,6 +65,11 @@ public:
     OccupancyGrid(const DistanceMapInterfacePtr& df, bool ref_counted = false);
 
     OccupancyGrid(const OccupancyGrid& o);
+
+    OccupancyGrid(OccupancyGrid&& o) = default;
+
+    OccupancyGrid& operator=(const OccupancyGrid& rhs);
+    OccupancyGrid& operator=(OccupancyGrid&& rhs) = default;
 
     const DistanceMapInterfacePtr& getDistanceField() const { return m_grid; }
 
@@ -145,13 +150,9 @@ public:
 
     /// \name Visualization
     ///@{
-    visualization_msgs::MarkerArray getVisualization(
-        const std::string& type) const;
-
-    visualization_msgs::MarkerArray getBoundingBoxVisualization() const;
-    visualization_msgs::MarkerArray getDistanceFieldVisualization(
-        double max_dist = -1.0) const;
-    visualization_msgs::MarkerArray getOccupiedVoxelsVisualization() const;
+    auto getBoundingBoxVisualization() const -> visual::Marker;
+    auto getDistanceFieldVisualization(double max_dist = -1.0) const -> visual::Marker;
+    auto getOccupiedVoxelsVisualization() const -> visual::Marker;
     ///@}
 
 private:

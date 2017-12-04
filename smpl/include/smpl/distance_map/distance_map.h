@@ -61,6 +61,12 @@ public:
         double resolution,
         double max_dist);
 
+    DistanceMap(const DistanceMap& o);
+    DistanceMap(DistanceMap&& o);
+
+    auto operator=(const DistanceMap& rhs) -> DistanceMap&;
+    auto operator=(DistanceMap&& rhs) -> DistanceMap&;
+
     double maxDistance() const;
 
     double getDistance(double x, double y, double z) const;
@@ -93,7 +99,7 @@ public:
         double world_x, double world_y, double world_z,
         int& x, int& y, int& z) const override;
 
-    bool isCellValid(int x, int y, int z) const;
+    bool isCellValid(int x, int y, int z) const override;
     ///@}
 
     friend Derived;
@@ -118,6 +124,8 @@ private:
         int pos;
     };
 
+    static constexpr int NO_UPDATE_DIR = dirnum(0, 0, 0);
+
     Grid3<Cell> m_cells;
 
     double m_max_dist;
@@ -127,7 +135,6 @@ private:
     int m_dmax_sqrd_int;
 
     int m_bucket;
-    int m_no_update_dir;
 
     // Direction offsets to each of the 27 neighbors, including (0, 0, 0).
     // Indexed by a call to dirnum(x, y, z, 0);
@@ -163,6 +170,8 @@ private:
     bucket_list m_open;
 
     std::vector<Cell*> m_rem_stack;
+
+    void rewire(const DistanceMap& o);
 
     void initBorderCells();
 

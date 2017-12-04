@@ -50,7 +50,7 @@
 #include <sbpl_collision_checking/debug.h>
 #include <sbpl_collision_checking/robot_collision_model.h>
 #include "transform_functions.h"
-#include "voxel_operations.h"
+#include <sbpl_collision_checking/voxel_operations.h>
 
 namespace sbpl {
 namespace collision {

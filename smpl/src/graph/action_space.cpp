@@ -37,16 +37,22 @@
 namespace sbpl {
 namespace motion {
 
-ActionSpace::ActionSpace(RobotPlanningSpace* pspace) :
-    RobotPlanningSpaceObserver(),
-    m_pspace(pspace)
-{
-    m_pspace->insertObserver(this);
-}
-
 ActionSpace::~ActionSpace()
 {
-    m_pspace->eraseObserver(this);
+    if (m_space) {
+        m_space->eraseObserver(this);
+    }
+}
+
+bool ActionSpace::init(RobotPlanningSpace* space)
+{
+    if (!space) {
+        return false;
+    }
+
+    m_space = space;
+    m_space->insertObserver(this);
+    return true;
 }
 
 } // namespace motion

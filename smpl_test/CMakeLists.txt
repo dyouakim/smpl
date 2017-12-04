@@ -45,6 +45,11 @@ generate_messages(
 
 catkin_package()
 
+include_directories(SYSTEM ${Boost_INCLUDE_DIRS})
+include_directories(SYSTEM ${Eigen_INCLUDE_DIRS})
+include_directories(SYSTEM ${catkin_INCLUDE_DIRS})
+include_directories(SYSTEM ${orocos_kdl_INCLUDE_DIRS})
+
 add_executable(callPlanner src/call_planner.cpp)
 target_link_libraries(callPlanner ${catkin_LIBRARIES})
 
@@ -72,11 +77,14 @@ target_link_libraries(sparse_grid_test ${Boost_LIBRARIES})
 add_executable(sparse_binary_grid_test src/sparse_binary_grid_test.cpp)
 target_link_libraries(sparse_binary_grid_test ${Boost_LIBRARIES})
 
-add_executable(xytheta src/xytheta.cpp)
-target_link_libraries(xytheta ${catkin_LIBRARIES})
+#add_executable(xytheta src/xytheta.cpp)
+#target_link_libraries(xytheta ${catkin_LIBRARIES})
 
 add_executable(debug_vis_demo src/debug_vis_demo.cpp)
 target_link_libraries(debug_vis_demo ${catkin_LIBRARIES})
+
+add_executable(distance_map_test src/distance_map_test.cpp)
+target_link_libraries(distance_map_test ${Boost_LIBRARIES} ${catkin_LIBRARIES})
 
 install(
     TARGETS callPlanner

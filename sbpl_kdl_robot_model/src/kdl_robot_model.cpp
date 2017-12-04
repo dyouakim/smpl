@@ -33,7 +33,7 @@
 #include <sbpl_kdl_robot_model/kdl_robot_model.h>
 
 // system includes
-#include <kdl/tree.hpp>
+#include <kdl_parser/kdl_parser.hpp>
 #include <leatherman/print.h>
 #include <leatherman/utils.h>
 #include <ros/ros.h>

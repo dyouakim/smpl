@@ -4,21 +4,21 @@
 #include <chrono>
 
 // system includes
-#include <ros/console.h>
 #include <sbpl/utils/key.h>
 
 // project includes
 #include <smpl/time.h>
+#include <smpl/console/console.h>
 
 namespace sbpl {
 namespace motion {
 
 ExperienceGraphPlanner::ExperienceGraphPlanner(
-    const RobotPlanningSpacePtr& pspace,
-    const RobotHeuristicPtr& heur)
+    RobotPlanningSpace* space,
+    RobotHeuristic* heur)
 :
     SBPLPlanner(),
-    m_pspace(pspace),
+    m_space(space),
     m_ege(nullptr),
     m_heur(heur),
     m_egh(nullptr),
@@ -31,16 +31,16 @@ ExperienceGraphPlanner::ExperienceGraphPlanner(
     m_eps(5.0),
     m_expand_count(0)
 {
-    environment_ = pspace.get();
+    environment_ = space;
 
-    m_ege = pspace->getExtension<ExperienceGraphExtension>();
+    m_ege = space->getExtension<ExperienceGraphExtension>();
     if (!m_ege) {
-        ROS_WARN_ONCE("ExperienceGraphPlanner recommends ExperienceGraphExtension");
+        SMPL_WARN_ONCE("ExperienceGraphPlanner recommends ExperienceGraphExtension");
     }
 
     m_egh = heur->getExtension<ExperienceGraphHeuristicExtension>();
     if (!m_egh) {
-        ROS_WARN_ONCE("ExperienceGraphPlanner recommends ExperienceGraphHeuristic");
+        SMPL_WARN_ONCE("ExperienceGraphPlanner recommends ExperienceGraphHeuristic");
     }
 }
 
@@ -67,10 +67,10 @@ int ExperienceGraphPlanner::replan(
     ++m_call_number;
     m_expand_count = 0;
 
-    ROS_INFO("Find path to goal");
+    SMPL_INFO("Find path to goal");
 
     if (!m_start_state || !m_goal_state) {
-        ROS_ERROR("Start or goal state not set");
+        SMPL_ERROR("Start or goal state not set");
         return 1;
     }
 
@@ -96,7 +96,7 @@ int ExperienceGraphPlanner::replan(
         auto now = clock::now();
         double elapsed = std::chrono::duration<double>(now - start_time).count();
         if (elapsed >= allowed_time) {
-            ROS_INFO("Ran out of time");
+            SMPL_INFO("Ran out of time");
             break;
         }
 
@@ -104,22 +104,22 @@ int ExperienceGraphPlanner::replan(
         m_open.pop();
         ++m_expand_count;
 
-        ROS_DEBUG("Expand state %d", min_state->state_id);
+        SMPL_DEBUG("Expand state %d", min_state->state_id);
 
         min_state->iteration_closed = 1;
 
         // path to goal found
         if (min_state->f >= fgoal || min_state == m_goal_state) {
-            ROS_INFO("Found path to goal");
+            SMPL_INFO("Found path to goal");
             path_found = true;
             break;
         }
 
         succs.clear();
         costs.clear();
-        m_pspace->GetSuccs(min_state->state_id, &succs, &costs);
+        m_space->GetSuccs(min_state->state_id, &succs, &costs);
 
-        ROS_DEBUG("  %zu successors", succs.size());
+        SMPL_DEBUG("  %zu successors", succs.size());
 
         for (size_t sidx = 0; sidx < succs.size(); ++sidx) {
             int succ_state_id = succs[sidx];
@@ -133,7 +133,7 @@ int ExperienceGraphPlanner::replan(
             }
 
             int new_cost = min_state->g + cost;
-            ROS_DEBUG("Compare new cost %d vs old cost %d", new_cost, succ_state->g);
+            SMPL_DEBUG("Compare new cost %d vs old cost %d", new_cost, succ_state->g);
             if (new_cost < succ_state->g) {
                 succ_state->g = new_cost;
                 succ_state->f = succ_state->g + m_eps * succ_state->h;
@@ -340,7 +340,7 @@ ExperienceGraphPlanner::createState(int state_id)
 void ExperienceGraphPlanner::reinitSearchState(SearchState* state)
 {
     if (state->call_number != m_call_number) {
-        ROS_DEBUG("Reinitialize state %d", state->state_id);
+        SMPL_DEBUG("Reinitialize state %d", state->state_id);
         state->g = INFINITECOST;
         state->h = m_heur->GetGoalHeuristic(state->state_id);
         state->f = INFINITECOST;

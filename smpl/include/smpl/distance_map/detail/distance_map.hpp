@@ -125,7 +125,6 @@ DistanceMap<Derived>::DistanceMap(
     m_dmax_int((int)std::ceil(m_max_dist * m_inv_res)),
     m_dmax_sqrd_int(m_dmax_int * m_dmax_int),
     m_bucket(m_dmax_sqrd_int + 1),
-    m_no_update_dir(dirnum(0, 0, 0)),
     m_neighbors(),
     m_indices(),
     m_neighbor_ranges(),
@@ -181,6 +180,94 @@ DistanceMap<Derived>::DistanceMap(
     propagateBorder();
 }
 
+template <class Derived>
+DistanceMap<Derived>::DistanceMap(const DistanceMap& o) :
+    DistanceMapInterface(o),
+    m_cells(o.m_cells),
+    m_max_dist(o.m_max_dist),
+    m_inv_res(o.m_inv_res),
+    m_dmax_int(o.m_dmax_int),
+    m_dmax_sqrd_int(o.m_dmax_sqrd_int),
+    m_bucket(o.m_bucket),
+    m_neighbors(o.m_neighbors),
+    m_indices(o.m_indices),
+    m_neighbor_ranges(o.m_neighbor_ranges),
+    m_neighbor_offsets(o.m_neighbor_offsets),
+    m_neighbor_dirs(o.m_neighbor_dirs),
+    m_sqrt_table(o.m_sqrt_table),
+    m_open(o.m_open),
+    m_rem_stack(o.m_rem_stack)
+{
+    rewire(o);
+}
+
+template <class Derived>
+DistanceMap<Derived>::DistanceMap(DistanceMap&& o) :
+    DistanceMapInterface(std::move(o)),
+    m_cells(std::move(o.m_cells)),
+    m_max_dist(std::move(o.m_max_dist)),
+    m_inv_res(std::move(o.m_inv_res)),
+    m_dmax_int(std::move(o.m_dmax_int)),
+    m_dmax_sqrd_int(std::move(o.m_dmax_sqrd_int)),
+    m_bucket(std::move(o.m_bucket)),
+    m_neighbors(std::move(o.m_neighbors)),
+    m_indices(std::move(o.m_indices)),
+    m_neighbor_ranges(std::move(o.m_neighbor_ranges)),
+    m_neighbor_offsets(std::move(o.m_neighbor_offsets)),
+    m_neighbor_dirs(std::move(o.m_neighbor_dirs)),
+    m_sqrt_table(std::move(o.m_sqrt_table)),
+    m_open(std::move(o.m_open)),
+    m_rem_stack(std::move(o.m_rem_stack))
+{
+}
+
+template <class Derived>
+auto DistanceMap<Derived>::operator=(const DistanceMap& rhs) -> DistanceMap&
+{
+    static_cast<DistanceMapInterface&>(*this) = rhs;
+    if (this != &rhs) {
+        m_cells = rhs.m_cells;
+        m_max_dist = rhs.m_max_dist;
+        m_inv_res = rhs.m_inv_res;
+        m_dmax_int = rhs.m_dmax_int;
+        m_dmax_sqrd_int = rhs.m_dmax_sqrd_int;
+        m_bucket = rhs.m_bucket;
+        m_neighbors = rhs.m_neighbors;
+        m_indices = rhs.m_indices;
+        m_neighbor_ranges = rhs.m_neighbor_ranges;
+        m_neighbor_offsets = rhs.m_neighbor_offsets;
+        m_neighbor_dirs = rhs.m_neighbor_dirs;
+        m_sqrt_table = rhs.m_sqrt_table;
+        m_open = rhs.m_open;
+        m_rem_stack = rhs.m_rem_stack;
+        rewire(rhs);
+    }
+    return *this;
+}
+
+template <class Derived>
+auto DistanceMap<Derived>::operator=(DistanceMap&& rhs) -> DistanceMap&
+{
+    static_cast<DistanceMapInterface&>(*this) = std::move(rhs);
+    if (this != &rhs) {
+        m_cells = std::move(rhs.m_cells);
+        m_max_dist = std::move(rhs.m_max_dist);
+        m_inv_res = std::move(rhs.m_inv_res);
+        m_dmax_int = std::move(rhs.m_dmax_int);
+        m_dmax_sqrd_int = std::move(rhs.m_dmax_sqrd_int);
+        m_bucket = std::move(rhs.m_bucket);
+        m_neighbors = std::move(rhs.m_neighbors);
+        m_indices = std::move(rhs.m_indices);
+        m_neighbor_ranges = std::move(rhs.m_neighbor_ranges);
+        m_neighbor_offsets = std::move(rhs.m_neighbor_offsets);
+        m_neighbor_dirs = std::move(rhs.m_neighbor_dirs);
+        m_sqrt_table = std::move(rhs.m_sqrt_table);
+        m_open = std::move(rhs.m_open);
+        m_rem_stack = std::move(rhs.m_rem_stack);
+    }
+    return *this;
+}
+
 /// Return the distance value for an invalid cell.
 template <typename Derived>
 double DistanceMap<Derived>::maxDistance() const
@@ -231,7 +318,7 @@ void DistanceMap<Derived>::addPointsToMap(
 
         Cell& c = m_cells(gx, gy, gz);
         if (c.dist_new > 0) {
-            c.dir = m_no_update_dir;
+            c.dir = NO_UPDATE_DIR;
             c.dist_new = 0;
             c.obs = &c;
             updateVertex(&c);
@@ -267,7 +354,7 @@ void DistanceMap<Derived>::removePointsFromMap(
         c.obs = nullptr;
 
         c.dist = m_dmax_sqrd_int;
-        c.dir = m_no_update_dir;
+        c.dir = NO_UPDATE_DIR;
         m_rem_stack.push_back(&c);
     }
 
@@ -324,7 +411,7 @@ void DistanceMap<Derived>::updatePointsInMap(
         if (c.obs != &c) {
             continue; // skip already-free cells
         }
-        c.dir = m_no_update_dir;
+        c.dir = NO_UPDATE_DIR;
         c.dist_new = m_dmax_sqrd_int;
         c.dist = m_dmax_sqrd_int;
         c.obs = nullptr;
@@ -339,7 +426,7 @@ void DistanceMap<Derived>::updatePointsInMap(
         if (c.dist_new == 0) {
             continue; // skip already-obstacle cells
         }
-        c.dir = m_no_update_dir;
+        c.dir = NO_UPDATE_DIR;
         c.dist_new = 0;
         c.obs = &c;
         updateVertex(&c);
@@ -405,8 +492,8 @@ double DistanceMap<Derived>::getCellDistance(int x, int y, int z) const
     return getDistance(x, y, z);
 }
 
-/// Return the effective grid coordinates of the cell containing the given point
-/// specified in world coordinates.
+/// Return the point in world coordinates marking the center of the cell at the
+/// given effective grid coordinates.
 template <typename Derived>
 void DistanceMap<Derived>::gridToWorld(
     int x, int y, int z,
@@ -417,8 +504,8 @@ void DistanceMap<Derived>::gridToWorld(
     world_z = (m_origin_z - m_res) + (z + 1) * m_res;
 }
 
-/// Return the point in world coordinates marking the center of the cell at the
-/// given effective grid coordinates.
+/// Return the effective grid coordinates of the cell containing the given point
+/// specified in world coordinates.
 template <typename Derived>
 void DistanceMap<Derived>::worldToGrid(
     double world_x, double world_y, double world_z,
@@ -436,6 +523,28 @@ bool DistanceMap<Derived>::isCellValid(int x, int y, int z) const
     return x >= 0 && x < m_cells.xsize() - 2 &&
         y >= 0 && y < m_cells.ysize() - 2 &&
         z >= 0 && z < m_cells.zsize() - 2;
+}
+
+template <typename Derived>
+void DistanceMap<Derived>::rewire(const DistanceMap& o)
+{
+    for (Cell& cell : m_cells) {
+        if (cell.obs) {
+            auto offset = cell.obs - o.m_cells.data();
+            cell.obs = m_cells.data() + offset;
+        }
+    }
+
+    for (auto& bucket : m_open) {
+        for (auto& cell : bucket) {
+            auto offset = cell - o.m_cells.data();
+            cell = m_cells.data() + offset;
+        }
+    }
+    for (auto& cell : m_rem_stack) {
+        auto offset = cell - o.m_cells.data();
+        cell = m_cells.data() + offset;
+    }
 }
 
 template <typename Derived>
@@ -528,7 +637,7 @@ template <typename Derived>
 void DistanceMap<Derived>::raise(Cell* s)
 {
     int nfirst, nlast;
-    std::tie(nfirst, nlast) = m_neighbor_ranges[m_no_update_dir];
+    std::tie(nfirst, nlast) = m_neighbor_ranges[NO_UPDATE_DIR];
     for (int i = nfirst; i != nlast; ++i) {
         Cell* n = s + m_neighbor_offsets[i];
         waveout(n);
@@ -548,7 +657,7 @@ void DistanceMap<Derived>::waveout(Cell* n)
     n->obs = nullptr;
 
     int nfirst, nlast;
-    std::tie(nfirst, nlast) = m_neighbor_ranges[m_no_update_dir];
+    std::tie(nfirst, nlast) = m_neighbor_ranges[NO_UPDATE_DIR];
     for (int i = nfirst; i != nlast; ++i) {
         Cell* a = n + m_neighbor_offsets[i];
         auto valid = [](Cell* c) { return c && c->obs == c; };
@@ -557,13 +666,13 @@ void DistanceMap<Derived>::waveout(Cell* n)
             if (dp < n->dist_new) {
                 n->dist_new = dp;
                 n->obs = a->obs;
-                n->dir = m_no_update_dir;
+                n->dir = NO_UPDATE_DIR;
             }
         }
     }
 
     if (n->obs != obs_old) {
-//        n->dir = m_no_update_dir;
+//        n->dir = NO_UPDATE_DIR;
         updateVertex(n);
     }
 }
@@ -593,7 +702,7 @@ void DistanceMap<Derived>::propagate()
 #endif
             } else {
                 s->dist = m_dmax_sqrd_int;
-                s->dir = m_no_update_dir;
+                s->dir = NO_UPDATE_DIR;
                 raise(s);
                 if (s->dist != s->dist_new) {
                     updateVertex(s);
@@ -631,7 +740,7 @@ void DistanceMap<Derived>::propagateRemovals()
         m_rem_stack.pop_back();
 
         int nfirst, nlast;
-        std::tie(nfirst, nlast) = m_neighbor_ranges[m_no_update_dir];
+        std::tie(nfirst, nlast) = m_neighbor_ranges[NO_UPDATE_DIR];
         for (int i = nfirst; i != nlast; ++i) {
             Cell* n = s + m_neighbor_offsets[i];
             auto valid = [](Cell* c) { return c && c->obs == c; };
@@ -640,7 +749,7 @@ void DistanceMap<Derived>::propagateRemovals()
                     n->dist_new = m_dmax_sqrd_int;
                     n->dist = m_dmax_sqrd_int;
                     n->obs = nullptr;
-                    n->dir = m_no_update_dir;
+                    n->dir = NO_UPDATE_DIR;
                     m_rem_stack.push_back(n);
                 }
             } else {
@@ -691,7 +800,7 @@ void DistanceMap<Derived>::resetCell(Cell& c) const
 #endif
     c.obs = nullptr;
     c.bucket = -1;
-    c.dir = m_no_update_dir;
+    c.dir = NO_UPDATE_DIR;
 }
 
 } // namespace sbpl

@@ -45,9 +45,9 @@ class ActionSpace : public RobotPlanningSpaceObserver
 {
 public:
 
-    ActionSpace(RobotPlanningSpace* pspace);
-
     virtual ~ActionSpace();
+
+    virtual bool init(RobotPlanningSpace* space);
 
     /// \brief Return the set of actions available from a state.
     ///
@@ -58,12 +58,12 @@ public:
     /// CollisionChecker's isStateToStateValid function during a search.
     virtual bool apply(const RobotState& parent, std::vector<Action>& actions) = 0;
 
-    RobotPlanningSpace* planningSpace() { return m_pspace; }
-    const RobotPlanningSpace* planningSpace() const { return m_pspace; }
+    RobotPlanningSpace* planningSpace() { return m_space; }
+    const RobotPlanningSpace* planningSpace() const { return m_space; }
 
 private:
 
-    RobotPlanningSpace* m_pspace;
+    RobotPlanningSpace* m_space = nullptr;
 };
 
 } // namespace motion

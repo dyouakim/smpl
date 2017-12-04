@@ -43,16 +43,12 @@ class ManipLatticeEgraph : public ManipLattice, public ExperienceGraphExtension
 {
 public:
 
-    ManipLatticeEgraph(
-        RobotModel* robot,
-        CollisionChecker* checker,
-        PlanningParams* params);
-
     /// \name Reimplemented Public Functions from ManipLattice
     ///@{
     bool extractPath(
         const std::vector<int>& ids,
-        std::vector<RobotState>& path, std::vector<geometry_msgs::PoseStamped>& eePath) override;
+        std::vector<RobotState>& path ) override;
+        //, std::vector<geometry_msgs::PoseStamped>& eePath) 
     ///@}
 
     /// \name Required Public Functions from ExperienceGraphExtension

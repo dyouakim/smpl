@@ -32,7 +32,7 @@
 // project includes
 #include <sbpl_collision_checking/attached_bodies_collision_model.h>
 #include <sbpl_collision_checking/debug.h>
-#include "voxel_operations.h"
+#include <sbpl_collision_checking/voxel_operations.h>
 
 namespace sbpl {
 namespace collision {

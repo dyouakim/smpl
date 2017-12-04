@@ -50,8 +50,8 @@
 
 // project includes
 #include <sbpl_collision_checking/robot_collision_state.h>
+#include <sbpl_collision_checking/voxel_operations.h>
 #include "transform_functions.h"
-#include "voxel_operations.h"
 
 namespace sbpl {
 namespace collision {

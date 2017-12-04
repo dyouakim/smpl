@@ -31,38 +31,29 @@
 
 #include <smpl/graph/robot_planning_space.h>
 
-// system includes
-#include <ros/console.h>
-
 // project includes
+#include <smpl/console/console.h>
 #include <smpl/heuristic/robot_heuristic.h>
 
 namespace sbpl {
 namespace motion {
 
-RobotPlanningSpace::RobotPlanningSpace(
-    RobotModel* robot,
-    CollisionChecker* checker,
-    const PlanningParams* params)
-:
-    DiscreteSpaceInformation(),
-    m_robot(robot),
-    m_checker(checker),
-    m_params(params),
-    m_actions(nullptr),
-    m_heuristics(),
-    m_obs()
-{
-}
-
 RobotPlanningSpace::~RobotPlanningSpace()
 {
 }
 
-bool RobotPlanningSpace::setActionSpace(const ActionSpacePtr& as)
+bool RobotPlanningSpace::init(
+    RobotModel* robot,
+    CollisionChecker* checker,
+    const PlanningParams* params)
 {
-    m_actions = as;
-    m_actions_const = as;
+    if (!robot || !checker || !params) {
+        return false;
+    }
+
+    m_robot = robot;
+    m_checker = checker;
+    m_params = params;
     return true;
 }
 
@@ -72,7 +63,7 @@ bool RobotPlanningSpace::insertHeuristic(RobotHeuristic* h)
     if (hit != m_heuristics.end()) {
         return false;
     }
-    ROS_DEBUG_NAMED(params()->graph_log, "Insert heuristic %p", h);
+    SMPL_DEBUG_NAMED(params()->graph_log, "Insert heuristic %p", h);
     m_heuristics.push_back(h);
     return true;
 }
@@ -83,7 +74,7 @@ bool RobotPlanningSpace::eraseHeuristic(const RobotHeuristic* h)
     if (hit == m_heuristics.end()) {
         return false;
     }
-    ROS_DEBUG_NAMED(params()->graph_log, "Erasure heuristic %p", h);
+    SMPL_DEBUG_NAMED(params()->graph_log, "Erasure heuristic %p", h);
     m_heuristics.erase(hit, m_heuristics.end());
     return true;
 }
@@ -112,7 +103,7 @@ bool RobotPlanningSpace::setGoal(const GoalConstraint& goal)
 void RobotPlanningSpace::insertObserver(RobotPlanningSpaceObserver* obs)
 {
     if (std::find(m_obs.begin(), m_obs.end(), obs) == m_obs.end()) {
-        ROS_DEBUG_NAMED(params()->graph_log, "Insert observer %p", obs);
+        SMPL_DEBUG_NAMED(params()->graph_log, "Insert observer %p", obs);
         m_obs.push_back(obs);
     }
 }
@@ -122,7 +113,7 @@ void RobotPlanningSpace::eraseObserver(RobotPlanningSpaceObserver* obs)
 {
     auto it = std::remove(m_obs.begin(), m_obs.end(), obs);
     if (it != m_obs.end()) {
-        ROS_DEBUG_NAMED(params()->graph_log, "Erase observer %p", obs);
+        SMPL_DEBUG_NAMED(params()->graph_log, "Erase observer %p", obs);
         m_obs.erase(it, m_obs.end());
     }
 }
@@ -136,7 +127,7 @@ bool RobotPlanningSpace::hasObserver(RobotPlanningSpaceObserver* obs) const
 void RobotPlanningSpace::notifyStartChanged(const RobotState& state)
 {
     for (RobotPlanningSpaceObserver* obs : m_obs) {
-        ROS_DEBUG_NAMED(params()->graph_log, "Notify %p of start change", obs);
+        SMPL_DEBUG_NAMED(params()->graph_log, "Notify %p of start change", obs);
         obs->updateStart(state);
     }
 }
@@ -144,7 +135,7 @@ void RobotPlanningSpace::notifyStartChanged(const RobotState& state)
 void RobotPlanningSpace::notifyGoalChanged(const GoalConstraint& goal)
 {
     for (RobotPlanningSpaceObserver* obs : m_obs) {
-        ROS_DEBUG_NAMED(params()->graph_log, "Notify %p of goal change", obs);
+        SMPL_DEBUG_NAMED(params()->graph_log, "Notify %p of goal change", obs);
         obs->updateGoal(goal);
     }
 }

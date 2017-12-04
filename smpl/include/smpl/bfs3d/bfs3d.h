@@ -35,11 +35,9 @@
 
 #include <stdio.h>
 #include <queue>
+#include <thread>
 #include <tuple>
 #include <iostream>
-#include <ros/ros.h>
-
-#include <boost/thread.hpp>
 
 namespace sbpl {
 namespace motion {
@@ -101,7 +99,7 @@ public:
 
 private:
 
-    boost::thread m_search_thread;
+    std::thread m_search_thread;
 
     int m_dim_x, m_dim_y, m_dim_z;
     int m_dim_xy, m_dim_xyz;
@@ -189,7 +187,7 @@ void BFS_3D::run(InputIt cells_begin, InputIt cells_end)
     m_queue_tail = start_count;
 
     // fire off background thread to compute bfs
-    m_search_thread = boost::thread(
+    m_search_thread = std::thread(
             static_cast<void (BFS_3D::*)(int, int, int volatile*, int*, int&, int&)>(&BFS_3D::search),
             this,
             m_dim_x,

@@ -38,6 +38,8 @@
 #include <chrono>
 #include <ratio>
 
+#include <smpl/config.h>
+
 // define clock APIs
 #define SMPL_CLOCK_ROS_TIME                 0
 #define SMPL_CLOCK_ROS_WALLTIME             1

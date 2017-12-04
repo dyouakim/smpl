@@ -32,8 +32,8 @@
 
 #include <smpl/robot_model.h>
 
-// system includes
-#include <ros/console.h>
+#include <assert.h>
+#include <sstream>
 
 namespace sbpl {
 namespace motion {
@@ -42,28 +42,28 @@ namespace ik_option {
 
 std::ostream& operator<<(std::ostream& o, IkOption option)
 {
-    switch (option) {
-    case UNRESTRICTED:
-        o << "UNRESTRICTED";
-        return o;
-    case RESTRICT_XYZ:
-        o << "RESTRICTED_XYZ_JOINTS";
-        return o;
-    }
-
+    o << to_cstring(option);
     return o;
 }
 
-std::string to_string(IkOption option)
+auto to_cstring(IkOption option) -> const char*
 {
-    std::stringstream ss;
-    ss << option;
-    return ss.str();
+    switch (option) {
+    case UNRESTRICTED:
+        return "UNRESTRICTED";
+    case RESTRICT_XYZ:
+        return "RESTRICT_XYZ";
+    case RESTRICT_RPY:
+        return "RESTRICT_RPY";
+    default:
+        assert(0);
+        return "";
+    }
 }
 
 } // namespace ik_option
 
-RobotModel::RobotModel()
+RobotModel::~RobotModel()
 {
 }
 

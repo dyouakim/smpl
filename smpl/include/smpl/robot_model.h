@@ -51,9 +51,7 @@ class RobotModel : public Extension
 {
 public:
 
-    RobotModel();
-
-    virtual ~RobotModel() { };
+    virtual ~RobotModel();
 
     /// \brief Return the lower position limit for a joint.
     virtual double minPosLimit(int jidx) const = 0;
@@ -121,7 +119,7 @@ enum IkOption
 };
 
 std::ostream& operator<<(std::ostream& o, IkOption option);
-std::string to_string(IkOption option);
+auto to_cstring(IkOption option) -> const char*;
 
 } // namespace ik_option
 

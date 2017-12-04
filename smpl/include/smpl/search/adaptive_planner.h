@@ -59,9 +59,7 @@ public:
         ARAStar::TimeParameters tracking;
     };
 
-    AdaptivePlanner(
-        const RobotPlanningSpacePtr& pspace,
-        const RobotHeuristicPtr& heur);
+    AdaptivePlanner(RobotPlanningSpace* space, RobotHeuristic* heur);
 
     ~AdaptivePlanner();
 

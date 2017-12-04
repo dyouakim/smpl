@@ -36,9 +36,6 @@
 // standard includes
 #include <vector>
 
-// system includes
-#include <trajectory_msgs/JointTrajectoryPoint.h>
-
 // project includes
 #include <smpl/collision_checker.h>
 #include <smpl/robot_model.h>

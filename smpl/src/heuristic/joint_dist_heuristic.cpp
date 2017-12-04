@@ -34,19 +34,19 @@
 // standard includes
 #include <cmath>
 
-// system includes
-#include <ros/console.h>
+#include <smpl/console/console.h>
 
 namespace sbpl {
 namespace motion {
 
-JointDistHeuristic::JointDistHeuristic(
-    const RobotPlanningSpacePtr& ps,
-    const OccupancyGrid* grid)
-:
-    RobotHeuristic(ps, grid)
+bool JointDistHeuristic::init(RobotPlanningSpace* space)
 {
-    m_ers = ps->getExtension<ExtractRobotStateExtension>();
+    if (!RobotHeuristic::init(space)) {
+        return false;
+    }
+
+    m_ers = space->getExtension<ExtractRobotStateExtension>();
+    return true;
 }
 
 double JointDistHeuristic::getMetricGoalDistance(double x, double y, double z)
@@ -76,7 +76,7 @@ int JointDistHeuristic::GetGoalHeuristic(int state_id)
         return 0;
     }
     if (planningSpace()->goal().type != GoalType::JOINT_STATE_GOAL) {
-        ROS_WARN_ONCE("Joint Distance Heuristic can only compute goal heuristics for Joint Goals");
+        SMPL_WARN_ONCE("Joint Distance Heuristic can only compute goal heuristics for Joint Goals");
         return 0;
     }
 

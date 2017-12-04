@@ -4,29 +4,29 @@
 // system includes
 #include <smpl/debug/visualize.h>
 
-class TextVisualizer : public sbpl::viz::VisualizerBase
+class TextVisualizer : public sbpl::visual::VisualizerBase
 {
 public:
 
     void visualize(
-        sbpl::viz::levels::Level level,
+        sbpl::visual::Level level,
         const visualization_msgs::MarkerArray& markers)
     {
         for (const visualization_msgs::Marker& marker : markers.markers) {
             switch (level) {
-            case sbpl::viz::levels::Debug:
+            case sbpl::visual::Level::Debug:
                 printf("[DEBUG] ");
                 break;
-            case sbpl::viz::levels::Info:
+            case sbpl::visual::Level::Info:
                 printf("[INFO]  ");
                 break;
-            case sbpl::viz::levels::Warn:
+            case sbpl::visual::Level::Warn:
                 printf("[WARN]  ");
                 break;
-            case sbpl::viz::levels::Error:
+            case sbpl::visual::Level::Error:
                 printf("[ERROR] ");
                 break;
-            case sbpl::viz::levels::Fatal:
+            case sbpl::visual::Level::Fatal:
                 printf("[FATAL] ");
                 break;
             }
@@ -138,8 +138,8 @@ private:
 
 int main(int argc, char* argv[])
 {
-    TextVisualizer viz;
-    sbpl::viz::set_visualizer(&viz);
+    TextVisualizer visual;
+    sbpl::visual::set_visualizer(&visual);
 
     visualization_msgs::MarkerArray ma;
     visualization_msgs::Marker m;

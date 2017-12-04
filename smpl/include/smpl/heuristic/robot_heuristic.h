@@ -42,8 +42,6 @@
 // project includes
 #include <smpl/extension.h>
 #include <smpl/forward.h>
-#include <smpl/occupancy_grid.h>
-#include <smpl/planning_params.h>
 #include <smpl/graph/robot_planning_space_observer.h>
 #include <smpl/graph/robot_planning_space.h>
 
@@ -59,11 +57,11 @@ class RobotHeuristic :
 {
 public:
 
+    RobotHeuristic() : Heuristic(nullptr) { }
+
     static const int Infinity = std::numeric_limits<int16_t>::max();
 
-    RobotHeuristic(
-        const RobotPlanningSpacePtr& pspace,
-        const OccupancyGrid* grid);
+    bool init(RobotPlanningSpace* space);
 
     virtual ~RobotHeuristic();
 
@@ -81,12 +79,8 @@ public:
 
     virtual bool setGoal(const GoalConstraint& goal);
 
-    RobotPlanningSpacePtr planningSpace() { return m_pspace; }
-    RobotPlanningSpaceConstPtr planningSpace() const { return m_pspace; }
-
-    const PlanningParams* params() const { return m_pspace->params(); }
-
-    const OccupancyGrid* grid() const { return m_grid; }
+    auto planningSpace() -> RobotPlanningSpace* { return m_space; }
+    auto planningSpace() const -> const RobotPlanningSpace* { return m_space; }
 
     /// \name Restate Required Public Functions from Heuristic
     ///@{
@@ -97,8 +91,7 @@ public:
 
 private:
 
-    RobotPlanningSpacePtr m_pspace;
-    const OccupancyGrid* m_grid;
+    RobotPlanningSpace* m_space = nullptr;
 };
 
 } // namespace motion

@@ -4,8 +4,13 @@
 #include <mutex>
 #include <unordered_map>
 
+#ifdef SMPL_SV_VISUALIZATION_MSGS
+#include <visualization_msgs/Marker.h>
+#include <visualization_msgs/MarkerArray.h>
+#endif
+
 namespace sbpl {
-namespace viz {
+namespace visual {
 
 namespace impl { // debug visualization level manager implementation
 
@@ -13,23 +18,23 @@ namespace impl { // debug visualization level manager implementation
 // manages the state of a named visualization
 
 struct DebugViz {
-    levels::Level level = levels::Info;
+    Level level = Level::Info;
 };
 
 static std::unordered_map<std::string, DebugViz> g_visualizations;
 static bool g_initialized = false;
 
-const char *to_cstring(levels::Level level) {
+const char *to_cstring(Level level) {
     switch (level) {
-    case levels::Debug:
+    case Level::Debug:
         return "DEBUG";
-    case levels::Info:
+    case Level::Info:
         return "INFO";
-    case levels::Warn:
+    case Level::Warn:
         return "WARN";
-    case levels::Error:
+    case Level::Error:
         return "ERROR";
-    case levels::Fatal:
+    case Level::Fatal:
         return "FATAL";
     default:
         return "";
@@ -39,7 +44,7 @@ const char *to_cstring(levels::Level level) {
 bool ParseVisualizationConfigLine(
     const std::string& line,
     std::vector<std::string>& split,
-    levels::Level& level)
+    Level& level)
 {
     split.clear();
 
@@ -68,15 +73,15 @@ bool ParseVisualizationConfigLine(
                 // parse the right hand side
                 std::string rhs(line.substr(next + 1));
                 if (rhs == "DEBUG") {
-                    level = levels::Debug;
+                    level = Level::Debug;
                 } else if (rhs == "INFO") {
-                    level = levels::Info;
+                    level = Level::Info;
                 } else if (rhs == "WARN") {
-                    level = levels::Warn;
+                    level = Level::Warn;
                 } else if (rhs == "ERROR") {
-                    level = levels::Error;
+                    level = Level::Error;
                 } else if (rhs == "FATAL") {
-                    level = levels::Fatal;
+                    level = Level::Fatal;
                 } else {
                     split.clear();
                 }
@@ -103,7 +108,7 @@ void Initialize()
                 std::getline(f, line);
 
                 std::vector<std::string> split;
-                levels::Level level;
+                Level level;
                 if (ParseVisualizationConfigLine(line, split, level)) {
                     std::string name = split.front();
                     for (size_t i = 1; i < split.size(); ++i) {
@@ -126,13 +131,13 @@ void* GetHandle(const std::string& name)
     return &g_visualizations[name];
 }
 
-bool IsEnabledFor(void* handle, levels::Level level)
+bool IsEnabledFor(void* handle, Level level)
 {
     Initialize();
     return static_cast<DebugViz*>(handle)->level <= level;
 }
 
-void GetVisualizations(std::unordered_map<std::string, levels::Level>& visualizations)
+void GetVisualizations(std::unordered_map<std::string, Level>& visualizations)
 {
     Initialize();
     visualizations.clear();
@@ -141,7 +146,7 @@ void GetVisualizations(std::unordered_map<std::string, levels::Level>& visualiza
     }
 }
 
-bool SetVisualizationLevel(const std::string& name, levels::Level level)
+bool SetVisualizationLevel(const std::string& name, Level level)
 {
     Initialize();
     auto& vis = g_visualizations[name];
@@ -176,7 +181,7 @@ void CheckLocationEnabledNoLock(VizLocation* loc)
 void InitializeVizLocation(
     VizLocation* loc,
     const std::string& name,
-    levels::Level level)
+    Level level)
 {
     std::unique_lock<std::mutex> lock(g_locations_mutex);
 
@@ -228,13 +233,13 @@ VisualizerBase* visualizer()
     return g_visualizer;
 }
 
-void get_visualizations(std::unordered_map<std::string, levels::Level>& visualizations)
+void get_visualizations(std::unordered_map<std::string, Level>& visualizations)
 {
     std::unique_lock<std::mutex> lock(g_locations_mutex);
     impl::GetVisualizations(visualizations);
 }
 
-bool set_visualization_level(const std::string& name, levels::Level level)
+bool set_visualization_level(const std::string& name, Level level)
 {
     std::unique_lock<std::mutex> lock(g_locations_mutex);
     bool changed = impl::SetVisualizationLevel(name, level);
@@ -244,9 +249,17 @@ bool set_visualization_level(const std::string& name, levels::Level level)
     return changed;
 }
 
-void visualize(
-    levels::Level level,
-    const visualization_msgs::MarkerArray& markers)
+void visualize(Level level, const visual::Marker& marker)
+{
+    std::unique_lock<std::mutex> lock(g_viz_mutex);
+    if (!g_visualizer) {
+        return;
+    }
+
+    g_visualizer->visualize(level, marker);
+}
+
+void visualize(Level level, const std::vector<visual::Marker>& markers)
 {
     std::unique_lock<std::mutex> lock(g_viz_mutex);
     if (!g_visualizer) {
@@ -254,6 +267,58 @@ void visualize(
     }
 
     g_visualizer->visualize(level, markers);
+}
+
+#ifdef SMPL_SV_VISUALIZATION_MSGS
+void visualize(Level level, const visualization_msgs::Marker& marker)
+{
+    std::unique_lock<std::mutex> lock(g_viz_mutex);
+    if (!g_visualizer) {
+        return;
+    }
+
+    g_visualizer->visualize(level, marker);
+}
+
+void visualize(Level level, const visualization_msgs::MarkerArray& markers)
+{
+    std::unique_lock<std::mutex> lock(g_viz_mutex);
+    if (!g_visualizer) {
+        return;
+    }
+
+    g_visualizer->visualize(level, markers);
+}
+
+void VisualizerBase::visualize(
+    Level level,
+    const visualization_msgs::Marker& mm)
+{
+}
+
+void VisualizerBase::visualize(
+    Level level,
+    const visualization_msgs::MarkerArray& markers)
+{
+    for (auto& m : markers.markers) {
+        visualize(level, m);
+    }
+}
+#endif
+
+void VisualizerBase::visualize(
+    Level level,
+    const std::vector<visual::Marker>& markers)
+{
+    for (auto& m : markers) {
+        visualize(level, m);
+    }
+}
+
+void VisualizerBase::visualize(
+    Level level,
+    const visual::Marker& marker)
+{
 }
 
 } // namespace viz

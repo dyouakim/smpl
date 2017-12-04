@@ -36,7 +36,7 @@
 #include <sstream>
 
 // system includes
-#include <ros/console.h>
+#include <smpl/console/console.h>
 
 namespace sbpl {
 namespace motion {
@@ -44,7 +44,7 @@ namespace motion {
 const std::string PlanningParams::DefaultRobotModelLog = "robot";
 const std::string PlanningParams::DefaultGraphLog = "graph";
 const std::string PlanningParams::DefaultHeuristicLog = "heuristic";
-const std::string PlanningParams::DefaultExpandsLog = "expands";
+const std::string PlanningParams::DefaultExpandsLog = "graph.expansions";
 const std::string PlanningParams::DefaultPostProcessingLog = "post_process";
 const std::string PlanningParams::DefaultSolutionLog = "solution";
 const std::string PlanningParams::DefaultSuccessorsLog = "successors";
@@ -62,155 +62,6 @@ std::string to_string(ShortcutType type)
         return "EUCLID_SPACE";
     default:
         return "UNRECOGNIZED_SHORTCUT_TYPE";
-    }
-}
-
-Parameter::Parameter(const Parameter& o) : m_type(Type::Invalid)
-{
-    copy(o);
-}
-
-Parameter& Parameter::operator=(const Parameter& value)
-{
-    if (this != &value) {
-        copy(value);
-    }
-    return *this;
-}
-
-Parameter& Parameter::operator=(bool value)
-{
-    if (isDynamic()) {
-        destroy();
-    }
-    m_type = Type::Bool;
-    m_value.asBool = value;
-    return *this;
-}
-
-Parameter& Parameter::operator=(int value)
-{
-    if (isDynamic()) {
-        destroy();
-    }
-    m_type = Type::Int;
-    m_value.asInt = value;
-    return *this;
-}
-
-Parameter& Parameter::operator=(double value)
-{
-    if (isDynamic()) {
-        destroy();
-    }
-    m_type = Type::Double;
-    m_value.asDouble = value;
-    return *this;
-}
-
-Parameter& Parameter::operator=(const std::string &value)
-{
-    if (m_type != Type::String) {
-        if (isDynamic()) {
-            destroy();
-        }
-        m_type = Type::String;
-        m_value.asString = new std::string(value);
-    } else {
-        *m_value.asString = value;
-    }
-    return *this;
-}
-
-Parameter& Parameter::operator=(const char* value)
-{
-    if (m_type != Type::String) {
-        if (isDynamic()) {
-            destroy();
-        }
-        m_type = Type::String;
-        m_value.asString = new std::string(value);
-    } else {
-        m_value.asString->assign(value);
-    }
-    return *this;
-}
-
-Parameter::~Parameter()
-{
-    switch (m_type) {
-    case Type::String:
-        delete m_value.asString;
-        break;
-    }
-}
-
-Parameter::operator bool&()
-{
-    if (m_type != Type::Bool) {
-        throw ParameterException("parameter is not a boolean");
-    }
-    return m_value.asBool;
-}
-
-Parameter::operator int&()
-{
-    if (m_type != Type::Int) {
-        throw ParameterException("parameter is not an int");
-    }
-    return m_value.asInt;
-}
-
-Parameter::operator double&()
-{
-    if (m_type != Type::Double) {
-        throw ParameterException("parameter is not a double");
-    }
-    return m_value.asDouble;
-}
-
-Parameter::operator std::string&()
-{
-    if (m_type != Type::String) {
-        throw ParameterException("parameter is not a string");
-    }
-    return *m_value.asString;
-}
-
-Parameter::operator const bool&() const
-{ return const_cast<Parameter*>(this)->operator bool&(); }
-
-Parameter::operator const int&() const
-{ return const_cast<Parameter*>(this)->operator int&(); }
-
-Parameter::operator const double&() const
-{ return const_cast<Parameter*>(this)->operator double&(); }
-
-Parameter::operator const std::string&() const
-{ return const_cast<Parameter*>(this)->operator std::string&(); }
-
-void Parameter::destroy()
-{
-    switch (m_type) {
-    case Type::String:
-        if (m_value.asString) {
-            delete m_value.asString;
-            m_value.asString = nullptr;
-        }
-        break;
-    }
-    m_type = Type::Invalid;
-}
-
-void Parameter::copy(const Parameter& o)
-{
-    destroy();
-
-    m_type = o.m_type;
-    if (o.m_type == Type::String) {
-        m_value.asString = new std::string(*o.m_value.asString);
-    } else {
-        m_value = o.m_value;
     }
 }
 
@@ -269,10 +120,9 @@ void PlanningParams::param(const std::string& name, bool& val, bool def) const
 {
     auto it = params.find(name);
     if (it == params.end()) {
-        std::stringstream ss;
         val = def;
         if (m_warn_defaults) {
-            ROS_WARN("%s", construct_warn_string(name, def).c_str());
+            SMPL_WARN("%s", construct_warn_string(name, def).c_str());
         }
         return;
     }
@@ -286,7 +136,7 @@ void PlanningParams::param(const std::string& name, int& val, int def) const
     if (it == params.end()) {
         val = def;
         if (m_warn_defaults) {
-            ROS_WARN("%s", construct_warn_string(name, def).c_str());
+            SMPL_WARN("%s", construct_warn_string(name, def).c_str());
         }
         return;
     }
@@ -294,16 +144,13 @@ void PlanningParams::param(const std::string& name, int& val, int def) const
     convertToInt(it->second, val);
 }
 
-void PlanningParams::param(
-    const std::string& name,
-    double& val,
-    double def) const
+void PlanningParams::param(const std::string& name, double& val, double def) const
 {
     auto it = params.find(name);
     if (it == params.end()) {
         val = def;
         if (m_warn_defaults) {
-            ROS_WARN("%s", construct_warn_string(name, def).c_str());
+            SMPL_WARN("%s", construct_warn_string(name, def).c_str());
         }
         return;
     }
@@ -320,7 +167,7 @@ void PlanningParams::param(
     if (it == params.end()) {
         val = def;
         if (m_warn_defaults) {
-            ROS_WARN("%s", construct_warn_string(name, def).c_str());
+            SMPL_WARN("%s", construct_warn_string(name, def).c_str());
         }
         return;
     }
@@ -380,101 +227,49 @@ bool PlanningParams::hasParam(const std::string& name) const
 
 void PlanningParams::convertToBool(const Parameter& p, bool& val) const
 {
-    switch (p.type()) {
-    case Parameter::Bool:
-        val = (const bool&)p;
-        break;
-    case Parameter::Int:
-        val = (bool)((const int&)p);
-        break;
-    case Parameter::Double:
-        val = (bool)((const double&)p);
-        break;
-    case Parameter::String: {
-        const std::string& pstr(p);
-        if (pstr == "true") {
-            val = true;
-        } else if (pstr == "false") {
-            val = false;
-        } else {
-            throw ParameterException("Could not convert parameter string to bool");
-        }
-    }   break;
-    default:
-        throw ParameterException("Parameter is untyped");
-        break;
-    }
+    struct bool_converter : public boost::static_visitor<bool> {
+        bool operator()(bool val) const { return (bool)val; }
+        bool operator()(double val) const { return (bool)val; }
+        bool operator()(int val) const { return (bool)val; }
+        bool operator()(const std::string& val) const { return val == "true"; }
+    };
+
+    val = boost::apply_visitor(bool_converter(), p);
 }
 
 void PlanningParams::convertToInt(const Parameter& p, int& val) const
 {
-    switch (p.type()) {
-    case Parameter::Bool:
-        val = (int)((const bool&)p);
-        break;
-    case Parameter::Int:
-        val = ((const int&)p);
-        break;
-    case Parameter::Double:
-        val = (int)((const double&)p);
-        break;
-    case Parameter::String:
-        try {
-            val = std::stoi((const std::string&)p);
-        } catch (const std::exception& ex) {
-            throw ParameterException("Failed to convert string to int");
-        }
-        break;
-    default:
-        throw ParameterException("Parameter is untyped");
-        break;
-    }
+    struct int_converter : public boost::static_visitor<int> {
+        int operator()(bool val) const { return (int)val; }
+        int operator()(double val) const { return (int)val; }
+        int operator()(int val) const { return (int)val; }
+        int operator()(const std::string& val) const { return std::stoi(val); }
+    };
+    val = boost::apply_visitor(int_converter(), p);
 }
 
 void PlanningParams::convertToDouble(const Parameter& p, double& val) const
 {
-    switch (p.type()) {
-    case Parameter::Bool:
-        val = (double)((const bool&)p);
-        break;
-    case Parameter::Int:
-        val = (double)((const int&)p);
-        break;
-    case Parameter::Double:
-        val = ((const double&)p);
-        break;
-    case Parameter::String:
-        try {
-            val = std::stod((const std::string&)p);
-        } catch (const std::exception& ex) {
-            throw ParameterException("Failed to convert string to double");
-        }
-        break;
-    default:
-        throw ParameterException("Parameter is untyped");
-        break;
-    }
+    struct double_converter : public boost::static_visitor<double> {
+        double operator()(bool val) const { return (double)val; }
+        double operator()(double val) const { return (double)val; }
+        double operator()(int val) const { return (double)val; }
+        double operator()(const std::string& val) const { return std::stod(val); }
+    };
+
+    val = boost::apply_visitor(double_converter(), p);
 }
 
 void PlanningParams::convertToString(const Parameter& p, std::string& val) const
 {
-    switch (p.type()) {
-    case Parameter::Bool:
-        val = ((const bool&)p) ? "true" : "false";
-        break;
-    case Parameter::Int:
-        val = std::to_string((const int&)p);
-        break;
-    case Parameter::Double:
-        val = std::to_string((const double&)p);
-        break;
-    case Parameter::String:
-        val = ((const std::string&)p);
-        break;
-    default:
-        throw ParameterException("Parameter is untyped");
-        break;
-    }
+    struct string_converter : public boost::static_visitor<std::string> {
+        std::string operator()(bool val) const { return val ? "true" : "false"; }
+        std::string operator()(double val) const { return std::to_string(val); }
+        std::string operator()(int val) const { return std::to_string(val); }
+        const std::string& operator()(const std::string& val) const { return val; }
+    };
+
+    val = boost::apply_visitor(string_converter(), p);
 }
 
 } // namespace motion

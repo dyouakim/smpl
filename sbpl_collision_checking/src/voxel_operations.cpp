@@ -1,4 +1,4 @@
-#include "voxel_operations.h"
+#include <sbpl_collision_checking/voxel_operations.h>
 
 // standard includes
 #include <utility>

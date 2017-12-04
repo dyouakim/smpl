@@ -31,37 +31,53 @@
 
 #include <smpl/heuristic/bfs_heuristic.h>
 
-// system includes
-#include <leatherman/viz.h>
-
 // project includes
 #include <smpl/bfs3d/bfs3d.h>
+#include <smpl/console/console.h>
 #include <smpl/intrusive_heap.h>
 #include <smpl/grid.h>
+#include <smpl/debug/marker_utils.h>
+#include <smpl/debug/colors.h>
 
 namespace sbpl {
 namespace motion {
 
-BfsHeuristic::BfsHeuristic(
-    const RobotPlanningSpacePtr& ps,
-    const OccupancyGrid* grid)
-:
-    RobotHeuristic(ps, grid),
-    m_bfs(),
-    m_goal_x(-1),
-    m_goal_y(-1),
-    m_goal_z(-1)
-{
-    m_pp = ps->getExtension<PointProjectionExtension>();
-    if (m_pp) {
-        ROS_INFO_NAMED(params()->heuristic_log, "Got Point Projection Extension!");
-    }
-    syncGridAndBfs();
-}
+static const char* LOG = "heuristic.bfs";
 
 BfsHeuristic::~BfsHeuristic()
 {
     // empty to allow forward declaration of BFS_3D
+}
+
+bool BfsHeuristic::init(RobotPlanningSpace* space, const OccupancyGrid* grid)
+{
+    if (!grid) {
+        return false;
+    }
+
+    if (!RobotHeuristic::init(space)) {
+        return false;
+    }
+
+    m_grid = grid;
+
+    m_pp = space->getExtension<PointProjectionExtension>();
+    if (m_pp) {
+        SMPL_INFO_NAMED(LOG, "Got Point Projection Extension!");
+    }
+    syncGridAndBfs();
+
+    return true;
+}
+
+void BfsHeuristic::setInflationRadius(double radius)
+{
+    m_inflation_radius = radius;
+}
+
+void BfsHeuristic::setCostPerCell(int cost_per_cell)
+{
+    m_cost_per_cell = cost_per_cell;
 }
 
 void BfsHeuristic::updateGoal(const GoalConstraint& goal)
@@ -71,10 +87,10 @@ void BfsHeuristic::updateGoal(const GoalConstraint& goal)
             goal.tgt_off_pose[0], goal.tgt_off_pose[1], goal.tgt_off_pose[2],
             gx, gy, gz);
 
-    ROS_DEBUG_NAMED(params()->heuristic_log, "Setting the BFS heuristic goal (%d, %d, %d)", gx, gy, gz);
+    SMPL_DEBUG_NAMED(LOG, "Setting the BFS heuristic goal (%d, %d, %d)", gx, gy, gz);
 
     if (!m_bfs->inBounds(gx, gy, gz)) {
-        ROS_ERROR_NAMED(params()->heuristic_log, "Heuristic goal is out of BFS bounds");
+        SMPL_ERROR_NAMED(LOG, "Heuristic goal is out of BFS bounds");
     }
 
     m_goal_x = gx;
@@ -148,7 +164,7 @@ int BfsHeuristic::GetGoalHeuristic(int state_id)
 
 int BfsHeuristic::GetStartHeuristic(int state_id)
 {
-    ROS_WARN_ONCE("BfsHeuristic::GetStartHeuristic unimplemented");
+    SMPL_WARN_ONCE("BfsHeuristic::GetStartHeuristic unimplemented");
     return 0;
 }
 
@@ -158,60 +174,53 @@ int BfsHeuristic::GetFromToHeuristic(int from_id, int to_id)
         return GetGoalHeuristic(from_id);
     }
     else {
-        ROS_WARN_ONCE("BfsHeuristic::GetFromToHeuristic unimplemented for arbitrary state pair");
+        SMPL_WARN_ONCE("BfsHeuristic::GetFromToHeuristic unimplemented for arbitrary state pair");
         return 0;
     }
 }
 
-visualization_msgs::MarkerArray BfsHeuristic::getWallsVisualization() const
+auto BfsHeuristic::getWallsVisualization() const -> visual::Marker
 {
-    std::vector<geometry_msgs::Point> points;
+    std::vector<Eigen::Vector3d> centers;
     int dimX = grid()->numCellsX();
     int dimY = grid()->numCellsY();
     int dimZ = grid()->numCellsZ();
+    for (int x = 0; x < dimX; x++) {
+    for (int y = 0; y < dimY; y++) {
     for (int z = 0; z < dimZ; z++) {
-        for (int y = 0; y < dimY; y++) {
-            for (int x = 0; x < dimX; x++) {
-                if (m_bfs->isWall(x, y, z)) {
-                    geometry_msgs::Point p;
-                    grid()->gridToWorld(x, y, z, p.x, p.y, p.z);
-                    points.push_back(p);
-                }
-            }
+        if (m_bfs->isWall(x, y, z)) {
+            Eigen::Vector3d p;
+            grid()->gridToWorld(x, y, z, p.x(), p.y(), p.z());
+            centers.push_back(p);
         }
     }
+    }
+    }
 
-    ROS_DEBUG_NAMED(params()->heuristic_log, "BFS Visualization contains %zu points", points.size());
+    SMPL_DEBUG_NAMED(LOG, "BFS Visualization contains %zu points", centers.size());
 
-    std_msgs::ColorRGBA color;
+    visual::Color color;
     color.r = 100.0f / 255.0f;
     color.g = 149.0f / 255.0f;
     color.b = 238.0f / 255.0f;
     color.a = 1.0f;
 
-    visualization_msgs::Marker cubes_marker = viz::getCubesMarker(
-            points,
+    return visual::MakeCubesMarker(
+            centers,
             grid()->resolution(),
             color,
             grid()->getReferenceFrame(),
-            "bfs_walls",
-            0);
-
-    visualization_msgs::MarkerArray ma;
-    ma.markers.push_back(std::move(cubes_marker));
-    return ma;
+            "bfs_walls");
 }
 
-visualization_msgs::MarkerArray BfsHeuristic::getValuesVisualization()
+auto BfsHeuristic::getValuesVisualization() -> visual::Marker
 {
-    visualization_msgs::MarkerArray ma;
-
     if (m_goal_x < 0 || m_goal_y < 0 || m_goal_z < 0) {
-        return ma;
+        return visual::MakeEmptyMarker();
     }
 
     if (m_bfs->isWall(m_goal_x, m_goal_y, m_goal_z)) {
-        return ma;
+        return visual::MakeEmptyMarker();
     }
 
     // hopefully this doesn't screw anything up too badly...this will flush the
@@ -219,21 +228,21 @@ visualization_msgs::MarkerArray BfsHeuristic::getValuesVisualization()
     // hereafter anyway
     int start_heur = GetGoalHeuristic(planningSpace()->getStartStateID());
     if (start_heur == Infinity) {
-        return ma;
+        return visual::MakeEmptyMarker();
     }
 
-    ROS_INFO("Start cell heuristic: %d", start_heur);
+    SMPL_INFO("Start cell heuristic: %d", start_heur);
 
     const int max_cost = (int)(1.1 * start_heur);
 
-    ROS_INFO("Get visualization of cells up to cost %d", max_cost);
+    SMPL_INFO("Get visualization of cells up to cost %d", max_cost);
 
     // ...and this will also flush the bfs...
 
     const size_t max_points = 4 * 4096;
 
-    std::vector<geometry_msgs::Point> points;
-    std::vector<std_msgs::ColorRGBA> colors;
+    std::vector<Eigen::Vector3d> points;
+    std::vector<visual::Color> colors;
 
     struct CostCell
     {
@@ -254,17 +263,7 @@ visualization_msgs::MarkerArray BfsHeuristic::getValuesVisualization()
         {
             double cost_pct = (double)c.g / (double)max_cost;
 
-            double hue = 300.0 - 300.0 * cost_pct;
-            double sat = 1.0;
-            double val = 1.0;
-            double r, g, b;
-            leatherman::HSVtoRGB(&r, &g, &b, hue, sat, val);
-
-            std_msgs::ColorRGBA color;
-            color.r = (float)r;
-            color.g = (float)g;
-            color.b = (float)b;
-            color.a = 1.0f;
+            visual::Color color = visual::MakeColorHSV(300.0 - 300.0 * cost_pct);
 
             auto clamp = [](double d, double lo, double hi) {
                 if (d < lo) {
@@ -280,8 +279,8 @@ visualization_msgs::MarkerArray BfsHeuristic::getValuesVisualization()
             color.g = clamp(color.g, 0.0f, 1.0f);
             color.b = clamp(color.b, 0.0f, 1.0f);
 
-            geometry_msgs::Point p;
-            grid()->gridToWorld(c.x, c.y, c.z, p.x, p.y, p.z);
+            Eigen::Vector3d p;
+            grid()->gridToWorld(c.x, c.y, c.z, p.x(), p.y(), p.z());
             points.push_back(p);
 
             colors.push_back(color);
@@ -289,7 +288,7 @@ visualization_msgs::MarkerArray BfsHeuristic::getValuesVisualization()
 
 //        visited(c.x, c.y, c.z) = true;
 
-        const int d = params()->cost_per_cell * m_bfs->getDistance(c.x, c.y, c.z);
+        const int d = m_cost_per_cell * m_bfs->getDistance(c.x, c.y, c.z);
 
         for (int dx = -1; dx <= 1; ++dx) {
         for (int dy = -1; dy <= 1; ++dy) {
@@ -314,34 +313,19 @@ visualization_msgs::MarkerArray BfsHeuristic::getValuesVisualization()
 
             visited(sx, sy, sz) = true;
 
-            int dd = params()->cost_per_cell * m_bfs->getDistance(sx, sy, sz);
+            int dd = m_cost_per_cell * m_bfs->getDistance(sx, sy, sz);
             cells.push({sx, sy, sz, dd});
         }
         }
         }
     }
 
-    visualization_msgs::Marker marker;
-    marker.header.stamp = ros::Time(0);
-    marker.header.frame_id = grid()->getReferenceFrame();
-    marker.ns = "bfs_values";
-    marker.id = 0;
-    marker.type = visualization_msgs::Marker::CUBE_LIST;
-    marker.action = visualization_msgs::Marker::ADD;
-    marker.pose.orientation.w = 1.0;
-    marker.scale.x = 0.5 * grid()->resolution();
-    marker.scale.y = 0.5 * grid()->resolution();
-    marker.scale.z = 0.5 * grid()->resolution();
-//    marker.color;
-    marker.lifetime = ros::Duration(0.0);
-    marker.frame_locked = false;
-    marker.points = std::move(points);
-    marker.colors = std::move(colors);
-    marker.text = "";
-    marker.mesh_use_embedded_materials = false;
-
-    ma.markers.push_back(std::move(marker));
-    return ma;
+    return visual::MakeCubesMarker(
+            std::move(points),
+            0.5 * grid()->resolution(),
+            std::move(colors),
+            grid()->getReferenceFrame(),
+            "bfs_values");
 }
 
 void BfsHeuristic::syncGridAndBfs()
@@ -349,23 +333,23 @@ void BfsHeuristic::syncGridAndBfs()
     const int xc = grid()->numCellsX();
     const int yc = grid()->numCellsY();
     const int zc = grid()->numCellsZ();
-//    ROS_DEBUG_NAMED(params()->heuristic_log_, "Initializing BFS of size %d x %d x %d = %d", xc, yc, zc, xc * yc * zc);
+//    SMPL_DEBUG_NAMED(LOG, "Initializing BFS of size %d x %d x %d = %d", xc, yc, zc, xc * yc * zc);
     m_bfs.reset(new BFS_3D(xc, yc, zc));
     const int cell_count = xc * yc * zc;
     int wall_count = 0;
+    for (int x = 0; x < xc; ++x) {
+    for (int y = 0; y < yc; ++y) {
     for (int z = 0; z < zc; ++z) {
-        for (int y = 0; y < yc; ++y) {
-            for (int x = 0; x < xc; ++x) {
-                const double radius = params()->planning_link_sphere_radius;
-                if (grid()->getDistance(x, y, z) <= radius) {
-                    m_bfs->setWall(x, y, z);
-                    ++wall_count;
-                }
-            }
+        const double radius = m_inflation_radius;
+        if (grid()->getDistance(x, y, z) <= radius) {
+            m_bfs->setWall(x, y, z);
+            ++wall_count;
         }
     }
+    }
+    }
 
-    ROS_DEBUG_NAMED(params()->heuristic_log, "%d/%d (%0.3f%%) walls in the bfs heuristic", wall_count, cell_count, 100.0 * (double)wall_count / cell_count);
+    SMPL_DEBUG_NAMED(LOG, "%d/%d (%0.3f%%) walls in the bfs heuristic", wall_count, cell_count, 100.0 * (double)wall_count / cell_count);
 }
 
 int BfsHeuristic::getBfsCostToGoal(const BFS_3D& bfs, int x, int y, int z) const
@@ -377,7 +361,7 @@ int BfsHeuristic::getBfsCostToGoal(const BFS_3D& bfs, int x, int y, int z) const
         return Infinity;
     }
     else {
-        return params()->cost_per_cell * bfs.getDistance(x, y, z);
+        return m_cost_per_cell * bfs.getDistance(x, y, z);
     }
 }
 

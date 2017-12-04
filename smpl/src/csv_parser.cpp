@@ -36,8 +36,8 @@
 
 #define CSV_DEBUG 0
 #if CSV_DEBUG
-#include <ros/console.h>
-#define PRINT(fmt, ...) ROS_DEBUG(fmt, ##__VA_ARGS__)
+#include <smpl/console/console.h>
+#define PRINT(fmt, ...) SMPL_DEBUG(fmt, ##__VA_ARGS__)
 #else
 #define PRINT(fmt, ...)
 #endif

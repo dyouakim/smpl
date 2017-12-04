@@ -29,39 +29,39 @@
 
 /// \author Andrew Dornbush
 
-// system includes
-#include <leatherman/print.h>
-
 // project includes
+#include <smpl/console/console.h>
 #include <smpl/heuristic/generic_egraph_heuristic.h>
 
 namespace sbpl {
 namespace motion {
 
-GenericEgraphHeuristic::GenericEgraphHeuristic(
-    const RobotPlanningSpacePtr& pspace,
-    const OccupancyGrid *grid,
-    const RobotHeuristicPtr& h)
-:
-    Extension(),
-    RobotHeuristic(pspace, grid),
-    ExperienceGraphHeuristicExtension(),
-    m_orig_h(h),
-    m_eg(nullptr),
-    m_eg_eps(1.0),
-    m_component_ids(),
-    m_shortcut_nodes(),
-    m_h_nodes(),
-    m_open()
+static const char* LOG = "heuristic.generic_egraph";
+
+bool GenericEgraphHeuristic::init(RobotPlanningSpace* space, RobotHeuristic* h)
 {
-    params()->param("egraph_epsilon", m_eg_eps, 1.0);
-
-    ROS_INFO_NAMED(params()->heuristic_log, "egraph_epsilon: %0.3f", m_eg_eps);
-
-    m_eg = pspace->getExtension<ExperienceGraphExtension>();
-    if (!m_eg) {
-        ROS_WARN_NAMED(params()->heuristic_log, "GenericEgraphHeuristic recommends ExperienceGraphExtension");
+    if (!h) {
+        return false;
     }
+
+    if (!RobotHeuristic::init(space)) {
+        return false;
+    }
+
+    m_orig_h = h;
+
+    m_eg = space->getExtension<ExperienceGraphExtension>();
+    if (!m_eg) {
+        SMPL_WARN_NAMED(LOG, "GenericEgraphHeuristic recommends ExperienceGraphExtension");
+    }
+
+    return true;
+}
+
+void GenericEgraphHeuristic::setWeightEGraph(double w)
+{
+    m_eg_eps = w;
+    SMPL_INFO_NAMED(LOG, "egraph_epsilon: %0.3f", m_eg_eps);
 }
 
 void GenericEgraphHeuristic::getEquivalentStates(
@@ -70,14 +70,10 @@ void GenericEgraphHeuristic::getEquivalentStates(
 {
     ExperienceGraph* eg = m_eg->getExperienceGraph();
     auto nodes = eg->nodes();
-    int best_h = std::numeric_limits<int>::max();
     const int equiv_thresh = 100;
     for (auto nit = nodes.first; nit != nodes.second; ++nit) {
         int egraph_state_id = m_eg->getStateID(*nit);
         int h = m_orig_h->GetFromToHeuristic(state_id, egraph_state_id);
-        if (h < best_h) {
-            best_h = h;
-        }
         if (h <= equiv_thresh) {
             ids.push_back(egraph_state_id);
         }
@@ -132,7 +128,7 @@ void GenericEgraphHeuristic::updateGoal(const GoalConstraint& goal)
 
     ExperienceGraph* eg = m_eg->getExperienceGraph();
     if (!eg) {
-        ROS_ERROR("Experience Graph Extended Planning Space has null Experience Graph");
+        SMPL_ERROR("Experience Graph Extended Planning Space has null Experience Graph");
         return;
     }
 
@@ -167,7 +163,7 @@ void GenericEgraphHeuristic::updateGoal(const GoalConstraint& goal)
         ++comp_count;
     }
 
-    ROS_INFO_NAMED(params()->heuristic_log, "Experience graph contains %d connected components", comp_count);
+    SMPL_INFO_NAMED(LOG, "Experience graph contains %d connected components", comp_count);
 
     ////////////////////////////
     // Compute Shortcut Nodes //

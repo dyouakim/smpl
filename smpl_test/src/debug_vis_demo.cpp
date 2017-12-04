@@ -7,6 +7,36 @@
 #include <smpl/debug/visualize.h>
 #include <smpl/debug/visualizer_ros.h>
 
+auto MakeCubeMarker(double t) -> sbpl::visual::Marker
+{
+    ROS_INFO("make cube marker");
+    auto marker = sbpl::visual::Marker{ };
+
+    marker.pose.position = Eigen::Vector3d(std::sin(t), 0.0, 0.0);
+    marker.pose.orientation = Eigen::Quaterniond::Identity();
+    marker.shape = sbpl::visual::Cube{ 1.0, 1.0, 1.0 };
+    marker.color = sbpl::visual::Color{ 1.0f, 0.0f, 0.0f, 1.0f };
+    marker.frame_id = "world";
+    marker.ns = "cube";
+
+    return marker;
+}
+
+auto MakeSphereMarker(double t) -> sbpl::visual::Marker
+{
+    ROS_INFO("make sphere marker");
+    auto marker = sbpl::visual::Marker{ };
+
+    marker.pose.position = Eigen::Vector3d(0.0, std::sin(t), 0.0);
+    marker.pose.orientation = Eigen::Quaterniond::Identity();
+    marker.shape = sbpl::visual::Sphere{ 0.5 };
+    marker.color = sbpl::visual::Color{ 0.0f, 1.0f, 0.0f, 1.0f };
+    marker.frame_id = "world";
+    marker.ns = "sphere";
+
+    return marker;
+}
+
 void VisualizeCube()
 {
     auto beginning = ros::Time::now();
@@ -15,27 +45,7 @@ void VisualizeCube()
     while (ros::ok()) {
         auto now = ros::Time::now();
 
-        auto make_cube_marker = [&]() -> visualization_msgs::MarkerArray {
-            ROS_INFO("make cube marker");
-            // make cube marker
-            visualization_msgs::MarkerArray ma;
-            visualization_msgs::Marker cube_marker;
-            cube_marker.header.stamp = now;
-            cube_marker.header.frame_id = "world";
-            cube_marker.ns = "cube";
-            cube_marker.id = 0;
-            cube_marker.type = visualization_msgs::Marker::CUBE;
-            cube_marker.action = visualization_msgs::Marker::ADD;
-            cube_marker.pose.orientation.w = 1.0;
-            cube_marker.pose.position.x = std::sin((now - beginning).toSec());
-            cube_marker.scale.x = cube_marker.scale.y = cube_marker.scale.z = 1.0;
-            cube_marker.color.r = cube_marker.color.a = 1.0;
-            cube_marker.lifetime = ros::Duration(0);
-            ma.markers.push_back(cube_marker);
-            return ma;
-        };
-
-        SV_SHOW_INFO_NAMED("cube", make_cube_marker());
+        SV_SHOW_INFO_NAMED("cube", MakeCubeMarker((now - beginning).toSec()));
 
         loop_rate.sleep();
     }
@@ -50,26 +60,9 @@ void VisualizeSphere()
         auto now = ros::Time::now();
 
         auto make_sphere_marker = [&]() -> visualization_msgs::MarkerArray {
-            ROS_INFO("make sphere marker");
-            // make sphere marker
-            visualization_msgs::MarkerArray ma;
-            visualization_msgs::Marker sphere_marker;
-            sphere_marker.header.stamp = now;
-            sphere_marker.header.frame_id = "world";
-            sphere_marker.ns = "sphere";
-            sphere_marker.id = 0;
-            sphere_marker.type = visualization_msgs::Marker::SPHERE;
-            sphere_marker.action = visualization_msgs::Marker::ADD;
-            sphere_marker.pose.orientation.w = 1.0;
-            sphere_marker.pose.position.y = std::sin((now - beginning).toSec());
-            sphere_marker.scale.x = sphere_marker.scale.y = sphere_marker.scale.z = 1.0;
-            sphere_marker.color.g = sphere_marker.color.a = 1.0;
-            sphere_marker.lifetime = ros::Duration(0);
-            ma.markers.push_back(sphere_marker);
-            return ma;
         };
 
-        SV_SHOW_INFO_NAMED("sphere", make_sphere_marker());
+        SV_SHOW_INFO_NAMED("sphere", MakeSphereMarker((now - beginning).toSec()));
 
         loop_rate.sleep();
     }
@@ -81,7 +74,7 @@ int main(int argc, char* argv[])
     ros::NodeHandle nh;
 
     sbpl::VisualizerROS visualizer;
-    sbpl::viz::set_visualizer(&visualizer);
+    sbpl::visual::set_visualizer(&visualizer);
 
     std::thread cube_vis_thread(VisualizeCube);
     std::thread sphere_vis_thread(VisualizeSphere);
@@ -92,19 +85,19 @@ int main(int argc, char* argv[])
     bool enabled = true;
     while (ros::ok()) {
         if (enabled) {
-            sbpl::viz::set_visualization_level(
+            sbpl::visual::set_visualization_level(
                     std::string(SV_NAME_PREFIX) + ".cube",
-                    sbpl::viz::levels::Warn);
-            sbpl::viz::set_visualization_level(
+                    sbpl::visual::Level::Warn);
+            sbpl::visual::set_visualization_level(
                     std::string(SV_NAME_PREFIX) + ".sphere",
-                    sbpl::viz::levels::Info);
+                    sbpl::visual::Level::Info);
         } else {
-            sbpl::viz::set_visualization_level(
+            sbpl::visual::set_visualization_level(
                     std::string(SV_NAME_PREFIX) + ".cube",
-                    sbpl::viz::levels::Info);
-            sbpl::viz::set_visualization_level(
+                    sbpl::visual::Level::Info);
+            sbpl::visual::set_visualization_level(
                     std::string(SV_NAME_PREFIX) + ".sphere",
-                    sbpl::viz::levels::Warn);
+                    sbpl::visual::Level::Warn);
         }
         enabled = !enabled;
 
@@ -114,6 +107,6 @@ int main(int argc, char* argv[])
     cube_vis_thread.join();
     sphere_vis_thread.join();
 
-    sbpl::viz::unset_visualizer();
+    sbpl::visual::unset_visualizer();
     return 0;
 }

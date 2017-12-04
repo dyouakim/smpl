@@ -43,7 +43,6 @@
 
 // system includes
 #include <boost/algorithm/string.hpp>
-#include <ros/ros.h>
 
 // project includes
 #include <smpl/forward.h>
@@ -66,9 +65,9 @@ class ManipLatticeActionSpace : public ActionSpace
 {
 public:
 
-    typedef std::vector<MotionPrimitive>::const_iterator const_iterator;
+    using const_iterator = std::vector<MotionPrimitive>::const_iterator;
 
-    ManipLatticeActionSpace(ManipLattice* pspace);
+    bool init(ManipLattice* space);
 
     bool load(const std::string& action_filename);
 
@@ -110,14 +109,14 @@ protected:
 
     std::vector<MotionPrimitive> m_mprims;
 
-    ForwardKinematicsInterface* m_fk_iface;
-    InverseKinematicsInterface* m_ik_iface;
+    ForwardKinematicsInterface* m_fk_iface = nullptr;
+    InverseKinematicsInterface* m_ik_iface = nullptr;
 
     bool m_mprim_enabled[MotionPrimitive::NUMBER_OF_MPRIM_TYPES];
     double m_mprim_thresh[MotionPrimitive::NUMBER_OF_MPRIM_TYPES];
 
-    bool m_use_multiple_ik_solutions;
-    bool m_use_long_and_short_dist_mprims;
+    bool m_use_multiple_ik_solutions        = false;
+    bool m_use_long_and_short_dist_mprims   = false;
 
     bool applyMotionPrimitive(
         const RobotState& state,

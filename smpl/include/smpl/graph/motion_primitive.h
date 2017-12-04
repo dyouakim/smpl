@@ -34,14 +34,13 @@
 #define SMPL_MOTION_PRIMITIVE_H
 
 // standard includes
-#include <vector>
+#include <iomanip>
 #include <sstream>
-
-// system includes
-#include <ros/console.h>
+#include <vector>
 
 // project includes
 #include <smpl/types.h>
+#include <smpl/console/console.h>
 
 namespace sbpl {
 namespace motion {
@@ -64,41 +63,35 @@ struct MotionPrimitive
     void print() const;
 };
 
-inline
-std::ostream& operator<<(std::ostream& o, MotionPrimitive::Type type)
-{
+inline auto to_cstring(MotionPrimitive::Type type) -> const char* {
     switch (type) {
     case MotionPrimitive::LONG_DISTANCE:
-        o << "LONG_DISTANCE";
-        break;
+        return "LONG_DISTANCE";
     case MotionPrimitive::SNAP_TO_RPY:
-        o << "SNAP_TO_RPY";
-        break;
+        return "SNAP_TO_RPY";
     case MotionPrimitive::SNAP_TO_XYZ:
-        o << "SNAP_TO_XYZ";
-        break;
+        return "SNAP_TO_XYZ";
     case MotionPrimitive::SNAP_TO_XYZ_RPY:
-        o << "SNAP_TO_XYZ_RPY";
-        break;
+        return "SNAP_TO_XYZ_RPY";
     case MotionPrimitive::SHORT_DISTANCE:
-        o << "SHORT_DISTANCE";
-        break;
+        return "SHORT_DISTANCE";
+    default:
+        assert(0);
+        return "";
     }
-    return o;
 }
 
-inline
-std::string to_string(MotionPrimitive::Type type)
+inline auto operator<<(std::ostream& o, MotionPrimitive::Type type)
+    -> std::ostream&
 {
-    std::stringstream ss;
-    ss << type;
-    return ss.str();
+    o << to_cstring(type);
+    return o;
 }
 
 inline
 void MotionPrimitive::print() const
 {
-    ROS_INFO("type: %d  nsteps: %d ", type, int(action.size()));
+    SMPL_INFO("type: %d  nsteps: %d ", type, int(action.size()));
     std::stringstream os;
     for (std::size_t j = 0; j < action.size(); ++j) {
         os.str("");
@@ -106,7 +99,7 @@ void MotionPrimitive::print() const
         for (std::size_t k = 0; k < action[j].size(); ++k) {
             os << std::setw(4) << std::setprecision(3) << std::fixed << action[j][k] << " ";
         }
-        ROS_INFO_STREAM(os.str());
+        SMPL_INFO_STREAM(os.str());
     }
 }
 

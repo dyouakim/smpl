@@ -36,11 +36,9 @@
 #include <chrono>
 #include <functional>
 
-// system includes
-#include <ros/console.h>
-
 // project includes
 #include <smpl/time.h>
+#include <smpl/console/console.h>
 
 #ifndef SBPL_MANIP_PROFILING
 #define SBPL_MANIP_PROFILING 0
@@ -77,7 +75,7 @@ public:
     {
 #if SBPL_MANIP_PROFILING
         if (m_elapsed != 0.0 && (m_times % m_throttle) == 0) {
-            ROS_INFO("%s: \t%0.3f Hz", m_name.c_str(), m_times / m_elapsed);
+            SMPL_INFO("%s: \t%0.3f Hz", m_name.c_str(), m_times / m_elapsed);
         }
         m_then = clock::now();
 #endif
@@ -98,7 +96,7 @@ public:
     {
 #if SBPL_MANIP_PROFILING
     if (m_elapsed != 0.0 && (m_times % m_throttle) == 0) {
-        ROS_INFO("%s: \t%0.3f Hz", m_name.c_str(), m_times / m_elapsed);
+        SMPL_INFO("%s: \t%0.3f Hz", m_name.c_str(), m_times / m_elapsed);
     }
     ++m_times;
 #endif

@@ -47,35 +47,34 @@ class GenericEgraphHeuristic :
 {
 public:
 
-    GenericEgraphHeuristic(
-        const RobotPlanningSpacePtr& pspace,
-        const OccupancyGrid *grid,
-        const RobotHeuristicPtr& h);
+    bool init(RobotPlanningSpace* space, RobotHeuristic* h);
 
-    /// \name Required Functions from ExperienceGraphHeuristicExtension
+    double weightEGraph() const { return m_eg_eps; }
+    void setWeightEGraph(double w);
+
+    /// \name ExperienceGraphHeuristicExtension Interface
     ///@{
     void getEquivalentStates(int state_id, std::vector<int>& ids) override;
-
     void getShortcutSuccs(int state_id, std::vector<int>& ids) override;
     ///@}
 
-    /// \name Required Functions from RobotHeuristic
+    /// \name RobotHeuristic Interface
     ///@{
     double getMetricStartDistance(double x, double y, double z) override;
     double getMetricGoalDistance(double x, double y, double z) override;
     ///@}
 
-    /// \name Required Functions from Extension
+    /// \name Extension Interface
     ///@{
     Extension* getExtension(size_t class_code) override;
     ///@}
 
-    /// \name Reimplemented Functions from RobotPlanningSpaceObserver
+    /// \name RobotPlanningSpaceObserver Interface
     ///@{
     void updateGoal(const GoalConstraint& goal) override;
     ///@}
 
-    /// \name Required Functions from Heuristic
+    /// \name Heuristic Interface
     ///@{
     int GetGoalHeuristic(int state_id) override;
     int GetStartHeuristic(int state_id) override;
@@ -88,11 +87,11 @@ private:
     static const int Wall = std::numeric_limits<int>::max();
     static const int Infinity = Unknown;
 
-    RobotHeuristicPtr m_orig_h;
+    RobotHeuristic* m_orig_h = nullptr;
 
-    ExperienceGraphExtension* m_eg;
+    ExperienceGraphExtension* m_eg = nullptr;
 
-    double m_eg_eps;
+    double m_eg_eps = 1.0;
 
     std::vector<int> m_component_ids;
     std::vector<std::vector<ExperienceGraph::node_id>> m_shortcut_nodes;
