@@ -21,4 +21,5 @@
     <depend>sbpl_kdl_robot_model</depend>
     <depend>sbpl_pr2_robot_model</depend>
     <depend>visualization_msgs</depend>
+    <depend>sbpl_adaptive</depend>
 </package>

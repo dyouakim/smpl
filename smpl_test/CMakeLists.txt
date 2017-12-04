@@ -19,7 +19,8 @@ find_package(catkin
         sbpl_collision_checking
         sbpl_kdl_robot_model
         sbpl_pr2_robot_model
-        visualization_msgs)
+        visualization_msgs
+        sbpl_adaptive)
 
 find_package(orocos_kdl REQUIRED)
 
@@ -29,6 +30,18 @@ include_directories(${Boost_INCLUDE_DIRS})
 include_directories(${Eigen_INCLUDE_DIRS})
 include_directories(${catkin_INCLUDE_DIRS})
 include_directories(${orocos_kdl_INCLUDE_DIRS})
+
+
+
+add_service_files(
+  FILES
+  moveObstacle.srv
+)
+
+generate_messages(
+  DEPENDENCIES
+  std_msgs
+)
 
 catkin_package()
 
