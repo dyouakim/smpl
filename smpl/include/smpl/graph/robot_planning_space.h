@@ -48,7 +48,7 @@
 #include <smpl/types.h>
 #include <smpl/graph/action_space.h>
 #include <smpl/graph/robot_planning_space_observer.h>
-
+#include <geometry_msgs/PoseStamped.h>
 namespace sbpl {
 namespace motion {
 
@@ -76,7 +76,7 @@ public:
 
     virtual bool extractPath(
         const std::vector<int>& ids,
-        std::vector<RobotState>& path) = 0;
+        std::vector<RobotState>& path, std::vector<geometry_msgs::PoseStamped>& eePath) = 0;
 
     virtual bool setActionSpace(const ActionSpacePtr& actions);
 
@@ -142,6 +142,9 @@ public:
         FILE* f = nullptr) override = 0;
     ///@}
 
+    virtual void getExpandedStates(std::vector<RobotState>& states) const  = 0;
+
+    
 private:
 
     RobotModel* m_robot;

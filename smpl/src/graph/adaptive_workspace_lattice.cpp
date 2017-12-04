@@ -330,7 +330,7 @@ int AdaptiveWorkspaceLattice::getGoalStateID() const
 
 bool AdaptiveWorkspaceLattice::extractPath(
     const std::vector<int>& ids,
-    std::vector<RobotState>& path)
+    std::vector<RobotState>& path, std::vector<geometry_msgs::PoseStamped>& eePath)
 {
     path.clear();
 
@@ -540,6 +540,12 @@ void AdaptiveWorkspaceLattice::PrintState(
     } else {
         fprintf(f, "%s\n", ss.str().c_str());
     }
+}
+
+
+void AdaptiveWorkspaceLattice:: getExpandedStates(std::vector<RobotState>& states) const 
+{
+    ROS_WARN("getExpandedStates not implemented for Adaptive Workspace Lattice!");
 }
 
 bool AdaptiveWorkspaceLattice::initMotionPrimitives()

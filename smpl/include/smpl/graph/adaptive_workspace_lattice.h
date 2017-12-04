@@ -158,7 +158,7 @@ public:
 
     bool extractPath(
         const std::vector<int>& ids,
-        std::vector<RobotState>& path) override;
+        std::vector<RobotState>& path, std::vector<geometry_msgs::PoseStamped>& eePath) override;
     ///@}
 
     /// \name Reimplemneted Functions from RobotPlanningSpace
@@ -186,6 +186,8 @@ public:
 
     void PrintState(int state_id, bool verbose, FILE* f = nullptr) override;
     ///@}
+
+    void getExpandedStates(std::vector<RobotState>& states) const override;
 
 private:
 

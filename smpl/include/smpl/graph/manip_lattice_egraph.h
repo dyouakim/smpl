@@ -52,7 +52,7 @@ public:
     ///@{
     bool extractPath(
         const std::vector<int>& ids,
-        std::vector<RobotState>& path) override;
+        std::vector<RobotState>& path, std::vector<geometry_msgs::PoseStamped>& eePath) override;
     ///@}
 
     /// \name Required Public Functions from ExperienceGraphExtension

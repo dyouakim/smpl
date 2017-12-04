@@ -216,7 +216,7 @@ void ManipLattice::GetSuccs(
     ROS_DEBUG_NAMED(params()->expands_log, "  angles: %s", to_string(parent_entry->state).c_str());
     ROS_DEBUG_NAMED(params()->expands_log, "  heur: %d", GetGoalHeuristic(state_id));
 
-    SV_SHOW_DEBUG(getStateVisualization(parent_entry->state, "expansion"));
+    SV_SHOW_INFO(getStateVisualization(parent_entry->state, "expansion"));
 
     int goal_succ_count = 0;
 
@@ -285,8 +285,9 @@ void ManipLattice::GetSuccs(
     if (goal_succ_count > 0) {
         ROS_DEBUG_NAMED(params()->expands_log, "Got %d goal successors!", goal_succ_count);
     }
-
+    //ROS_ERROR_STREAM("Expanded node iD is "<<state_id);
     m_expanded_states.push_back(state_id);
+    //std::getchar();
 }
 
 Stopwatch GetLazySuccsStopwatch("GetLazySuccs", 10);
@@ -908,7 +909,7 @@ void ManipLattice::computeCostPerCell()
 
 bool ManipLattice::extractPath(
     const std::vector<int>& idpath,
-    std::vector<RobotState>& path)
+    std::vector<RobotState>& path, std::vector<geometry_msgs::PoseStamped>& eePath)
 {
     if (idpath.empty()) {
         return true;

@@ -63,7 +63,7 @@ ManipLatticeEgraph::ManipLatticeEgraph(
 
 bool ManipLatticeEgraph::extractPath(
     const std::vector<int>& idpath,
-    std::vector<RobotState>& path)
+    std::vector<RobotState>& path, std::vector<geometry_msgs::PoseStamped>& eePath)
 {
     ROS_DEBUG_NAMED(params()->graph_log, "State ID Path: %s", to_string(idpath).c_str());
     if (idpath.empty()) {

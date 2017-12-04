@@ -113,7 +113,7 @@ public:
 
     RobotState getStartConfiguration() const;
 
-    void getExpandedStates(std::vector<RobotState>& states) const;
+    void getExpandedStates(std::vector<RobotState>& states) const override;
 
     void setVisualizationFrameId(const std::string& frame_id);
     const std::string& visualizationFrameId() const;
@@ -146,7 +146,7 @@ public:
     int getGoalStateID() const override;
     bool extractPath(
         const std::vector<int>& ids,
-        std::vector<RobotState>& path) override;
+        std::vector<RobotState>& path, std::vector<geometry_msgs::PoseStamped>& eePath) override;
     ///@}
 
     /// \name Required Public Functions from Extension

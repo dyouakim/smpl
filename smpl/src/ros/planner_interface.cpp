@@ -64,6 +64,7 @@
 #include <smpl/ros/adaptive_planner_allocator.h>
 #include <smpl/ros/adaptive_workspace_lattice_allocator.h>
 #include <smpl/ros/araplanner_allocator.h>
+#include <smpl/ros/traplanner_allocator.h>
 #include <smpl/ros/bfs_heuristic_allocator.h>
 #include <smpl/ros/dijkstra_egraph_3d_heuristic_allocator.h>
 #include <smpl/ros/euclid_dist_heuristic_allocator.h>
@@ -104,7 +105,8 @@ PlannerInterface::PlannerInterface(
     if (m_robot) {
         m_fk_iface = m_robot->getExtension<ForwardKinematicsInterface>();
     }
-
+    
+    //invalidTrajListener_ = new boost::thread(boost::bind(&PlannerInterface::listenInvalidTraj, this));
     m_pspace_allocators.insert(std::make_pair(
             "manip",
             std::make_shared<ManipLatticeAllocator>(m_grid)));
@@ -147,6 +149,8 @@ PlannerInterface::PlannerInterface(
             "egwastar", std::make_shared<ExperienceGraphPlannerAllocator>()));
     m_planner_allocators.insert(std::make_pair(
             "padastar", std::make_shared<AdaptivePlannerAllocator>()));
+    m_planner_allocators.insert(std::make_pair(
+            "trastar", std::make_shared<TRAPlannerAllocator>()));
 }
 
 PlannerInterface::~PlannerInterface()
@@ -208,6 +212,7 @@ bool PlannerInterface::solve(
     const moveit_msgs::MotionPlanRequest& req,
     moveit_msgs::MotionPlanResponse& res)
 {
+
     clearMotionPlanResponse(req, res);
 
     if (!m_initialized) {
@@ -233,16 +238,17 @@ bool PlannerInterface::solve(
         return false;
     }
 
-    // plan
+   // plan
     res.trajectory_start = planning_scene.robot_state;
     ROS_INFO_NAMED(PI_LOGGER, "Allowed Time (s): %0.3f", req.allowed_planning_time);
 
     auto then = clock::now();
 
     std::vector<RobotState> path;
+    std::vector<geometry_msgs::PoseStamped> eePath;
     if (req.goal_constraints.front().position_constraints.size() > 0) {
         ROS_INFO_NAMED(PI_LOGGER, "Planning to position!");
-        if (!planToPose(req, path, res)) {
+        if (!planToPose(req, path, eePath, res)) {
             auto now = clock::now();
             res.planning_time = to_seconds(now - then);
             return false;
@@ -277,6 +283,7 @@ bool PlannerInterface::solve(
     }
 
     auto& traj = res.trajectory.joint_trajectory;
+    res.trajectory.ee_pose = eePath;
     convertJointVariablePathToJointTrajectory(path, traj);
     traj.header.seq = 0;
     traj.header.stamp = ros::Time::now();
@@ -286,10 +293,10 @@ bool PlannerInterface::solve(
     }
 
     profilePath(traj);
-
     auto now = clock::now();
     res.planning_time = to_seconds(now - then);
     m_res = res; // record the last result
+    
     return true;
 }
 
@@ -507,7 +514,7 @@ bool PlannerInterface::setGoalPosition(
     return true;
 }
 
-bool PlannerInterface::plan(double allowed_time, std::vector<RobotState>& path)
+bool PlannerInterface::plan(double allowed_time, std::vector<RobotState>& path, std::vector<geometry_msgs::PoseStamped>& eePath)
 {
     // NOTE: this should be done after setting the start/goal in the environment
     // to allow the heuristic to tailor the visualization to the current
@@ -522,7 +529,18 @@ bool PlannerInterface::plan(double allowed_time, std::vector<RobotState>& path)
     // reinitialize the search space
     m_planner->force_planning_from_scratch();
 
-    // plan
+     // plan
+    ReplanParams replan_params();
+    /* ReplanParams replan_params(m_params.allowed_time);
+    replan_params.initial_eps = m_params.epsilon;
+    replan_params.final_eps = 1.0;
+    replan_params.dec_eps = 0.2;
+    replan_params.return_first_solution = false;
+    // replan_params.max_time = m_params.allowed_time_;
+    replan_params.repair_time = 1.0;
+    b_ret = m_planner->replan(&solution_state_ids, replan_params, &m_sol_cost); */
+
+
     b_ret = m_planner->replan(allowed_time, &solution_state_ids, &m_sol_cost);
 
     // check if an empty plan was received.
@@ -544,7 +562,81 @@ bool PlannerInterface::plan(double allowed_time, std::vector<RobotState>& path)
         ROS_INFO_NAMED(PI_LOGGER, "  Solution Cost: %d", m_sol_cost);
 
         path.clear();
-        if (!m_pspace->extractPath(solution_state_ids, path)) {
+        if (!m_pspace->extractPath(solution_state_ids, path, eePath)) {
+            ROS_ERROR("Failed to convert state id path to joint variable path");
+            return false;
+        }
+        for(int i=0;i<path.size();i++)
+        {
+            lastPlannedPath.push_back(path[i]);
+            ROS_WARN_STREAM("Point ["<<i<<"] "<<path[i][0]<<","<<path[i][1]<<","<<path[i][2]<<","<<path[i][3]<<","<<path[i][4]<<","<<path[i][5]<<","<<path[i][6]<<","<<path[i][7]);
+        }
+
+        //ROS_WARN_STREAM("After planning path size is  "<<lastPlannedPath.size());
+    }
+
+    return b_ret;
+}
+
+
+bool PlannerInterface::repairPlan(double allowed_time, std::vector<RobotState>& path, std::vector<geometry_msgs::PoseStamped>& eePath, int inavlidTrajPointIdx)
+{
+    // NOTE: this should be done after setting the start/goal in the environment
+    // to allow the heuristic to tailor the visualization to the current
+    // scenario
+    SV_SHOW_DEBUG(getBfsWallsVisualization());
+    SV_SHOW_DEBUG(getBfsValuesVisualization());
+    bool b_ret = false;
+    std::vector<int> solution_state_ids;
+
+    //repair plan
+    ROS_WARN_STREAM("Here1 "<<lastPlannedPath.size());
+    
+    RobotState invalidState = lastPlannedPath[inavlidTrajPointIdx];
+    ROS_WARN_STREAM("Here2");
+ 
+    std::vector<RobotState> expandedStates;
+    m_pspace->getExpandedStates(expandedStates);
+    int lastValidExpansionStep = -1;
+    std::vector<bool> isFound(invalidState.size(),0);
+    ROS_WARN_STREAM("Before extracting data ");
+    for(int i =0;i<expandedStates.size();i++)
+    {
+        for(int j=0;j<invalidState.size();j++)
+        {
+            if(invalidState[j]!=expandedStates[i][j])
+                break;
+            else 
+                isFound[j] = 1;
+        }  
+        if(std::accumulate(std::begin(isFound), std::begin(isFound) + invalidState.size(), 0)==invalidState.size()) 
+        {
+            lastValidExpansionStep = i;
+            ROS_ERROR_STREAM("Found the state in the expanded ones with id "<<lastValidExpansionStep);
+        }    
+    }
+    b_ret = m_planner->replan(allowed_time, &solution_state_ids, &m_sol_cost);
+
+    // check if an empty plan was received.
+    if (b_ret && solution_state_ids.size() <= 0) {
+        ROS_WARN_NAMED(PI_LOGGER, "Path returned by the planner is empty?");
+        b_ret = false;
+    }
+
+    // if a path is returned, then pack it into msg form
+    if (b_ret && (solution_state_ids.size() > 0)) {
+        ROS_INFO_NAMED(PI_LOGGER, "Planning succeeded");
+        ROS_INFO_NAMED(PI_LOGGER, "  Num Expansions (Initial): %d", m_planner->get_n_expands_init_solution());
+        ROS_INFO_NAMED(PI_LOGGER, "  Num Expansions (Final): %d", m_planner->get_n_expands());
+        ROS_INFO_NAMED(PI_LOGGER, "  Epsilon (Initial): %0.3f", m_planner->get_initial_eps());
+        ROS_INFO_NAMED(PI_LOGGER, "  Epsilon (Final): %0.3f", m_planner->get_solution_eps());
+        ROS_INFO_NAMED(PI_LOGGER, "  Time (Initial): %0.3f", m_planner->get_initial_eps_planning_time());
+        ROS_INFO_NAMED(PI_LOGGER, "  Time (Final): %0.3f", m_planner->get_final_eps_planning_time());
+        ROS_INFO_NAMED(PI_LOGGER, "  Path Length (states): %zu", solution_state_ids.size());
+        ROS_INFO_NAMED(PI_LOGGER, "  Solution Cost: %d", m_sol_cost);
+
+        path.clear();
+        if (!m_pspace->extractPath(solution_state_ids, path, eePath)) {
             ROS_ERROR("Failed to convert state id path to joint variable path");
             return false;
         }
@@ -554,7 +646,7 @@ bool PlannerInterface::plan(double allowed_time, std::vector<RobotState>& path)
 
 bool PlannerInterface::planToPose(
     const moveit_msgs::MotionPlanRequest& req,
-    std::vector<RobotState>& path,
+    std::vector<RobotState>& path, std::vector<geometry_msgs::PoseStamped>& eePath,
     moveit_msgs::MotionPlanResponse& res)
 {
     const auto& goal_constraints_v = req.goal_constraints;
@@ -564,6 +656,18 @@ bool PlannerInterface::planToPose(
 
     // only acknowledge the first constraint
     const auto& goal_constraints = goal_constraints_v.front();
+
+    if(req.repair_index>0)
+    {
+        ROS_WARN_STREAM("Need to repair plan !!!!!!!!!!");
+        if (!repairPlan(req.allowed_planning_time, path, eePath, req.repair_index)) {
+            ROS_ERROR("Failed to repair plan within alotted time frame (%0.2f seconds, %d expansions)", req.allowed_planning_time, m_planner->get_n_expands());
+            res.error_code.val = moveit_msgs::MoveItErrorCodes::PLANNING_FAILED;
+            return false;
+        }
+    }
+    else
+    {
 
     if (!setGoalPosition(goal_constraints)) {
         ROS_ERROR("Failed to set goal position");
@@ -576,11 +680,13 @@ bool PlannerInterface::planToPose(
         res.error_code.val = moveit_msgs::MoveItErrorCodes::START_STATE_IN_COLLISION;
         return false;
     }
-
-    if (!plan(req.allowed_planning_time, path)) {
-        ROS_ERROR("Failed to plan within alotted time frame (%0.2f seconds, %d expansions)", req.allowed_planning_time, m_planner->get_n_expands());
-        res.error_code.val = moveit_msgs::MoveItErrorCodes::PLANNING_FAILED;
-        return false;
+    
+    
+        if (!plan(req.allowed_planning_time, path, eePath)) {
+            ROS_ERROR("Failed to plan within alotted time frame (%0.2f seconds, %d expansions)", req.allowed_planning_time, m_planner->get_n_expands());
+            res.error_code.val = moveit_msgs::MoveItErrorCodes::PLANNING_FAILED;
+            return false;
+        }
     }
 
     res.error_code.val = moveit_msgs::MoveItErrorCodes::SUCCESS;
@@ -609,8 +715,8 @@ bool PlannerInterface::planToConfiguration(
         res.error_code.val = moveit_msgs::MoveItErrorCodes::START_STATE_IN_COLLISION;
         return false;
     }
-
-    if (!plan(req.allowed_planning_time, path)) {
+    std::vector<geometry_msgs::PoseStamped> eePath;
+    if (!plan(req.allowed_planning_time, path, eePath)) {
         ROS_ERROR("Failed to plan within alotted time frame (%0.2f seconds, %d expansions)", req.allowed_planning_time, m_planner->get_n_expands());
         res.error_code.val = moveit_msgs::MoveItErrorCodes::PLANNING_FAILED;
         return false;
@@ -1308,6 +1414,18 @@ bool PlannerInterface::writePath(
 
     return true;
 }
+
+/*void PlannerInterface::setStateFromRobotState(const moveit::core::RobotState& robot_state,  sbpl::motion::RobotState& state) const
+{
+    assert(robot_state.getVariableCount() == m_robot->jointCount());
+    state.resize(m_robot->jointCount(),0);
+    for (size_t vidx = 0; vidx < m_robot->getPlanningJoints().size(); ++vidx) 
+    {   
+        std::string joint = m_robot->getPlanningJoints()[vidx];
+        ROS_ERROR_STREAM("The current joint "<<joint);
+        state[vidx] = robot_state.getVariablePosition(joint);
+    }
+}*/
 
 } // namespace motion
 } // namespace sbpl

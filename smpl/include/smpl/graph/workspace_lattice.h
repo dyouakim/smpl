@@ -137,8 +137,10 @@ public:
 
     bool extractPath(
         const std::vector<int>& ids,
-        std::vector<RobotState>& path) override;
+        std::vector<RobotState>& path, std::vector<geometry_msgs::PoseStamped>& eePath) override;
     ///@}
+
+    void extractEEPose(WorkspaceState currntState, geometry_msgs::PoseStamped& eePose);
 
     /// \name Required Public Functions from Extension
     ///@{
@@ -173,6 +175,8 @@ public:
     int GetTrueCost(int parent_id, int child_id) override;
     ///@}
 
+    void getExpandedStates(std::vector<RobotState>& states) const override;
+
 private:
 
     WorkspaceLatticeState* m_goal_entry;
@@ -190,6 +194,8 @@ private:
     // maps id -> state
     std::vector<WorkspaceLatticeState*> m_states;
 
+    // stateIDs of expanded states
+    std::vector<int> m_expanded_states;
     clock::time_point m_t_start;
     mutable bool m_near_goal; // mutable for assignment in isGoal
 

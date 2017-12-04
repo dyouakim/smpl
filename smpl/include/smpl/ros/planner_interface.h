@@ -38,14 +38,18 @@
 #include <memory>
 #include <string>
 #include <vector>
-
+#include <numeric> 
 // system includes
 #include <Eigen/Dense>
+#include <std_msgs/Int8.h>
+#include <boost/thread.hpp>
 #include <moveit_msgs/MotionPlanRequest.h>
 #include <moveit_msgs/MotionPlanResponse.h>
 #include <moveit_msgs/PlanningScene.h>
 #include <moveit_msgs/RobotState.h>
 #include <moveit_msgs/RobotTrajectory.h>
+#include <moveit/robot_model/robot_model.h>
+#include <moveit/robot_state/robot_state.h>
 #include <ros/ros.h>
 #include <sbpl/headers.h>
 #include <visualization_msgs/MarkerArray.h>
@@ -60,6 +64,7 @@
 #include <smpl/ros/planner_allocator.h>
 #include <smpl/ros/planning_space_allocator.h>
 #include <smpl/heuristic/robot_heuristic.h>
+#include <smpl/types.h>
 
 SBPL_CLASS_FORWARD(SBPLPlanner);
 
@@ -130,6 +135,8 @@ public:
         const std::vector<RobotState>& path) const;
     ///@}
 
+    void setStateFromRobotState( const moveit::core::RobotState& robot_state, sbpl::motion::RobotState& state) const;
+
 protected:
 
     RobotModel* m_robot;
@@ -160,6 +167,8 @@ protected:
     moveit_msgs::MotionPlanRequest m_req;
     moveit_msgs::MotionPlanResponse m_res;
 
+    std::vector<RobotState> lastPlannedPath;
+
     bool checkConstructionArgs() const;
 
     // Initialize the SBPL planner and the smpl environment
@@ -179,7 +188,7 @@ protected:
     // Plan a path to a cartesian goal(s)
     bool planToPose(
         const moveit_msgs::MotionPlanRequest& req,
-        std::vector<RobotState>& path,
+        std::vector<RobotState>& path,std::vector<geometry_msgs::PoseStamped>& eePath,
         moveit_msgs::MotionPlanResponse& res);
     bool planToConfiguration(
         const moveit_msgs::MotionPlanRequest& req,
@@ -187,7 +196,9 @@ protected:
         moveit_msgs::MotionPlanResponse& res);
 
     // Retrieve plan from sbpl
-    bool plan(double allowed_time, std::vector<RobotState>& path);
+    bool plan(double allowed_time, std::vector<RobotState>& path, std::vector<geometry_msgs::PoseStamped>& eePath);
+
+    bool repairPlan(double allowed_time, std::vector<RobotState>& path, std::vector<geometry_msgs::PoseStamped>& eePath, int inavlidTrajPointIdx);
 
     bool extractGoalPoseFromGoalConstraints(
         const moveit_msgs::Constraints& goal_constraints,
@@ -223,6 +234,7 @@ protected:
     bool writePath(
         const moveit_msgs::RobotState& ref,
         const moveit_msgs::RobotTrajectory& traj) const;
+
 };
 
 } // namespace motion

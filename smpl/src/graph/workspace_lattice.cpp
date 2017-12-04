@@ -83,6 +83,7 @@ WorkspaceLattice::WorkspaceLattice(
     m_state_to_id(),
     m_states(),
     m_t_start(),
+    m_expanded_states(),
     m_near_goal(false)
 {
     // this should serve as a reasonable dummy state since no valid state should
@@ -231,11 +232,21 @@ int WorkspaceLattice::getGoalStateID() const
     return m_goal_state_id;
 }
 
-bool WorkspaceLattice::extractPath(
+/*bool WorkspaceLattice::extractPath(
     const std::vector<int>& ids,
     std::vector<RobotState>& path)
 {
+    std::vector<geometry_msgs::PoseStamped> eePath;
+    return extractPath(ids, path, eePath);
+}*/
+
+bool WorkspaceLattice::extractPath(
+    const std::vector<int>& ids,
+    std::vector<RobotState>& path, std::vector<geometry_msgs::PoseStamped>& eePath)
+{
     path.clear();
+
+    
 
     if (ids.empty()) {
         return true;
@@ -256,7 +267,12 @@ bool WorkspaceLattice::extractPath(
                 ROS_ERROR_NAMED(params()->graph_log, "Failed to get state entry for state %d", state_id);
                 return false;
             }
-            path.push_back(entry->state);
+            geometry_msgs::PoseStamped eePose;
+            WorkspaceState state;
+            stateCoordToWorkspace(entry->coord,state);
+            extractEEPose(state,eePose);
+            path.push_back(entry->state); 
+            eePath.push_back(eePose);
         }
 
         SV_SHOW_INFO(getStateVisualization(path.back(), "goal_state"));
@@ -274,7 +290,7 @@ bool WorkspaceLattice::extractPath(
             ROS_ERROR_NAMED(params()->graph_log, "cannot determine goal state successors during path extraction");
             return false;
         }
-
+        //ROS_WARN_STREAM("ID "<<prev_id);
         if (curr_id == getGoalStateID()) {
             // TODO: variant of get succs that returns unique state ids
             WorkspaceLatticeState* prev_entry = getState(prev_id);
@@ -316,15 +332,34 @@ bool WorkspaceLattice::extractPath(
                 ROS_ERROR_NAMED(params()->graph_log, "failed to find valid goal successor during path extraction");
                 return false;
             }
-
+            geometry_msgs::PoseStamped eePose;
+            WorkspaceState state;
+            stateCoordToWorkspace(best_goal_entry->coord,state);
+            extractEEPose(state,eePose);
             path.push_back(best_goal_entry->state);
+            eePath.push_back(eePose);
         } else {
             WorkspaceLatticeState* state_entry = getState(curr_id);
+            geometry_msgs::PoseStamped eePose;
+            WorkspaceState state;
+            stateCoordToWorkspace(state_entry->coord,state);
+            extractEEPose(state,eePose);
             path.push_back(state_entry->state);
+            eePath.push_back(eePose);
         }
+        
     }
-
     return true;
+}
+
+void WorkspaceLattice::extractEEPose(WorkspaceState currntState, geometry_msgs::PoseStamped& eePose)
+{
+    eePose.header.frame_id = "world";
+    eePose.header.stamp = ros::Time::now();
+    eePose.pose.position.x = currntState[0];
+    eePose.pose.position.y = currntState[1];
+    eePose.pose.position.z = currntState[2];
+    eePose.pose.orientation = tf::createQuaternionMsgFromRollPitchYaw(currntState[3],currntState[4],currntState[5]);
 }
 
 Extension* WorkspaceLattice::getExtension(size_t class_code)
@@ -365,7 +400,7 @@ void WorkspaceLattice::GetSuccs(
     ROS_DEBUG_NAMED(params()->expands_log, "  coord: %s", to_string(parent_entry->coord).c_str());
     ROS_DEBUG_NAMED(params()->expands_log, "  state: %s", to_string(parent_entry->state).c_str());
 
-    SV_SHOW_DEBUG(getStateVisualization(parent_entry->state, "expansion"));
+    SV_SHOW_INFO(getStateVisualization(parent_entry->state, "expansion"));
 
     std::vector<Action> actions;
     getActions(*parent_entry, actions);
@@ -385,6 +420,7 @@ void WorkspaceLattice::GetSuccs(
             continue;
         }
 
+        
         const WorkspaceState& final_state = action.back();
         WorkspaceCoord succ_coord;
         stateWorkspaceToCoord(final_state, succ_coord);
@@ -412,6 +448,9 @@ void WorkspaceLattice::GetSuccs(
         ROS_DEBUG_NAMED(params()->expands_log, "        state: %s", to_string(succ_state->state).c_str());
         ROS_DEBUG_NAMED(params()->expands_log, "        cost: %5d", edge_cost);
     }
+
+    m_expanded_states.push_back(state_id);
+    //ROS_ERROR_STREAM("Expanded node iD is "<<state_id);
 }
 
 void WorkspaceLattice::GetPreds(
@@ -518,6 +557,20 @@ void WorkspaceLattice::GetLazySuccs(
     }
 }
 
+
+void WorkspaceLattice::getExpandedStates(std::vector<RobotState>& states) const 
+{
+    RobotState state(robot()->jointVariableCount(), 0);
+
+    for (size_t i = 0; i < m_expanded_states.size(); ++i) {
+        const WorkspaceLatticeState* entry = getState(m_expanded_states[i]);
+        if (entry) {
+            states.push_back(entry->state);
+        }
+        states.push_back(state);
+    }
+}
+
 int WorkspaceLattice::GetTrueCost(int parent_id, int child_id)
 {
     ROS_DEBUG_NAMED(params()->expands_log, "Evaluate cost of transition %d -> %d", parent_id, child_id);
@@ -569,6 +622,7 @@ int WorkspaceLattice::GetTrueCost(int parent_id, int child_id)
         return -1;
     }
 }
+
 
 bool WorkspaceLattice::initMotionPrimitives()
 {
@@ -651,6 +705,7 @@ bool WorkspaceLattice::setGoalPose(const GoalConstraint& goal)
     ROS_DEBUG_NAMED(params()->graph_log, "  rpy (radians): (%0.2f, %0.2f, %0.2f)", goal.pose[3], goal.pose[4], goal.pose[5]);
     ROS_DEBUG_NAMED(params()->graph_log, "  tol (radians): (%0.3f, %0.3f, %0.3f)", goal.rpy_tolerance[0], goal.rpy_tolerance[1], goal.rpy_tolerance[2]);
 
+    m_expanded_states.clear();
     m_near_goal = false;
     m_t_start = clock::now();
 
