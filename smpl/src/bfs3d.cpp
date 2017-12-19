@@ -176,6 +176,13 @@ void BFS_3D::run(int x, int y, int z)
     // initialize starting distance
     m_distance_grid[origin] = 0;
 
+    /*search(m_dim_x,
+            m_dim_xy,
+            m_distance_grid,
+            m_queue,
+            std::ref(m_queue_head),
+            std::ref(m_queue_tail));*/
+
     // fire off background thread to compute bfs
     m_search_thread = std::thread(
             static_cast<void (BFS_3D::*)(int, int, int volatile*, int*, int&, int&)>(&BFS_3D::search),
@@ -186,6 +193,7 @@ void BFS_3D::run(int x, int y, int z)
             m_queue,
             std::ref(m_queue_head),
             std::ref(m_queue_tail));
+
     m_running = true;
 }
 
