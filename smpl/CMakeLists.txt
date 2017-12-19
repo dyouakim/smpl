@@ -49,7 +49,7 @@ else()
     add_definitions(-DSMPL_LOG_FILE_AND_LINE=1)
 endif()
 
-add_definitions(-DSBPL_VISUALIZE_MIN_SEVERITY=SBPL_VISUALIZE_SEVERITY_DEBUG)
+add_definitions(-DSBPL_VISUALIZE_MIN_SEVERITY=SBPL_VISUALIZE_SEVERITY_INFO)
 
 include_directories(SYSTEM ${Boost_INCLUDE_DIRS})
 include_directories(SYSTEM ${EIGEN3_INCLUDE_DIR})
@@ -97,6 +97,7 @@ add_library(
     src/graph/workspace_lattice_base.cpp
     src/heuristic/attractor_heuristic.cpp
     src/heuristic/bfs_heuristic.cpp
+    src/heuristic/multi_bfs_heuristic.cpp
     src/heuristic/egraph_bfs_heuristic.cpp
     src/heuristic/generic_egraph_heuristic.cpp
     src/heuristic/euclid_dist_heuristic.cpp
@@ -106,7 +107,8 @@ add_library(
     src/search/arastar.cpp
     src/search/experience_graph_planner.cpp
     src/search/adaptive_planner.cpp
-    src/search/traplanner.cpp
+    src/search/trastar.cpp
+    src/search/marastar.cpp
     src/search/focal_mhastar.cpp
     src/search/meta_mhastar_dts.cpp
     src/search/mhastarpp.cpp
