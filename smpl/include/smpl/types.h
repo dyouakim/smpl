@@ -146,6 +146,7 @@ public:
 #endif
 
 typedef std::vector<RobotState> Action;
+typedef std::vector<double> ActionsWeight;
 
 enum GoalType
 {
@@ -155,6 +156,15 @@ enum GoalType
     JOINT_STATE_GOAL,
     NUMBER_OF_GOAL_TYPES
 };
+
+enum GroupType
+{
+    FAILURE = -2,
+    ANY, 
+    BASE,
+    ARM
+} ;
+
 
 struct GoalConstraint
 {

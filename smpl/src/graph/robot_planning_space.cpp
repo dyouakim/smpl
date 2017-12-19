@@ -186,6 +186,13 @@ int RobotPlanningSpace::GetTrueCost(int parent_id, int child_id)
 
     return costs[std::distance(succs.begin(), sit)];
 }
+void RobotPlanningSpace::GetSuccsByGroup(
+        int state_id,
+        std::vector<int>* succs,
+        std::vector<int>* costs, int group)
+{
+    
+}
 
 } // namespace motion
 } // namespace sbpl

@@ -97,6 +97,7 @@ public:
     ///@{
     int cost_per_cell;             ///< uniform cost of cells in heuristic
     double planning_link_sphere_radius;
+    double base_radius;
     ///@}
 
     /// \name Post-Processing

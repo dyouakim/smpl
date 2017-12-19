@@ -71,7 +71,7 @@ PlanningParams::PlanningParams() :
     cost_per_cell(DefaultCostPerCell),
 
     planning_link_sphere_radius(DefaultPlanningLinkSphereRadius),
-
+    base_radius(DefaultPlanningLinkSphereRadius),
     shortcut_path(DefaultShortcutPath),
     interpolate_path(DefaultInterpolatePath),
     shortcut_type(DefaultShortcutType),

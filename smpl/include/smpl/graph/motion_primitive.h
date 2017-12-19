@@ -59,8 +59,11 @@ struct MotionPrimitive
 
     Type type;
     Action action;
-
+    GroupType group;
+    double weight;
+    
     void print() const;
+
 };
 
 inline auto to_cstring(MotionPrimitive::Type type) -> const char* {
@@ -88,20 +91,6 @@ inline auto operator<<(std::ostream& o, MotionPrimitive::Type type)
     return o;
 }
 
-inline
-void MotionPrimitive::print() const
-{
-    SMPL_INFO("type: %d  nsteps: %d ", type, int(action.size()));
-    std::stringstream os;
-    for (std::size_t j = 0; j < action.size(); ++j) {
-        os.str("");
-        os << "[step: " << int(j+1) << "/" << action.size() << "] ";
-        for (std::size_t k = 0; k < action[j].size(); ++k) {
-            os << std::setw(4) << std::setprecision(3) << std::fixed << action[j][k] << " ";
-        }
-        SMPL_INFO_STREAM(os.str());
-    }
-}
 
 } // namespace motion
 } // namespace sbpl

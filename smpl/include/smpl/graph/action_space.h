@@ -58,6 +58,8 @@ public:
     /// CollisionChecker's isStateToStateValid function during a search.
     virtual bool apply(const RobotState& parent, std::vector<Action>& actions) = 0;
 
+    virtual bool apply(const RobotState& parent, std::vector<Action>& actions, ActionsWeight& weights, int group) = 0;
+
     RobotPlanningSpace* planningSpace() { return m_space; }
     const RobotPlanningSpace* planningSpace() const { return m_space; }
 

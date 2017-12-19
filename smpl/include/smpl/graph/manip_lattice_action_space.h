@@ -72,7 +72,7 @@ public:
     bool load(const std::string& action_filename);
 
     void addMotionPrim(
-        const std::vector<double>& mprim,
+        const std::vector<double>& mprim, int group, double weight,
         bool short_dist_mprim,
         bool add_converse = true);
 
@@ -94,9 +94,13 @@ public:
     void useLongAndShortPrims(bool enable);
     void ampThresh(MotionPrimitive::Type type, double thresh);
 
-    /// \name Required Public Functions from ActionSpace
+     /// \name Required Public Functions from ActionSpace
     ///@{
     bool apply(const RobotState& parent, std::vector<Action>& actions);
+
+    /// \name Required Public Functions from ActionSpace
+    ///@{
+    bool apply(const RobotState& parent, std::vector<Action>& actions, ActionsWeight& weights, int group);
     ///@}
 
     /// \name Reimplemented Public Functions from RobotPlanningSpaceObserver
@@ -141,6 +145,13 @@ protected:
         double start_dist,
         double goal_dist,
         MotionPrimitive::Type type) const;
+
+
+     // heterogeneous comparison:
+    struct MotionPrimitiveComparator
+    {
+        bool operator() ( const MotionPrimitive& mp, int id ) const { return mp.group == id; }
+    };
 };
 
 } // namespace motion

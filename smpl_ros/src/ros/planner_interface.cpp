@@ -64,6 +64,7 @@
 #include <smpl/graph/manip_lattice_egraph.h>
 
 #include <smpl/heuristic/bfs_heuristic.h>
+#include <smpl/heuristic/multi_bfs_heuristic.h>
 #include <smpl/heuristic/egraph_bfs_heuristic.h>
 #include <smpl/heuristic/euclid_dist_heuristic.h>
 #include <smpl/heuristic/multi_frame_bfs_heuristic.h>
@@ -72,6 +73,8 @@
 
 #include <smpl/search/adaptive_planner.h>
 #include <smpl/search/arastar.h>
+#include <smpl/search/trastar.h>
+#include <smpl/search/marastar.h>
 #include <smpl/search/experience_graph_planner.h>
 
 namespace sbpl {
@@ -135,7 +138,6 @@ auto MakeManipLattice(
     ////////////////
 
     std::vector<double> resolutions(robot->jointVariableCount());
-
     std::string disc_string;
     if (!params->getParam("discretization", disc_string)) {
         ROS_ERROR_NAMED(PI_LOGGER, "Parameter 'discretization' not found in planning params");
@@ -432,6 +434,22 @@ auto MakeBFSHeuristic(
     return std::move(h);
 };
 
+auto MakeMultiBFSHeuristic(
+    RobotPlanningSpace* space,
+    const OccupancyGrid* grid,
+    const PlanningParams& params)
+    -> std::unique_ptr<RobotHeuristic>
+{
+    auto h = make_unique<MultiBfsHeuristic>();
+    h->setCostPerCell(params.cost_per_cell);
+    h->setInflationRadius(params.planning_link_sphere_radius);
+    h->setBaseInflationRadius(params.base_radius);
+    if (!h->init(space, grid)) {
+        return nullptr;
+    }
+    return std::move(h);
+};
+
 auto MakeEuclidDistHeuristic(
     RobotPlanningSpace* space,
     const PlanningParams& params)
@@ -546,7 +564,105 @@ auto MakeARAStar(RobotPlanningSpace* space, RobotHeuristic* heuristic)
     if (space->params()->getParam("repair_time", repair_time)) {
         search->setAllowedRepairTime(repair_time);
     }
-     //search->setAllowedRepairTime(-1);
+    return std::move(search);
+}
+
+
+auto MakeTRAStar(RobotPlanningSpace* space, RobotHeuristic* heuristic)
+    -> std::unique_ptr<SBPLPlanner>
+{
+    const bool forward_search = true;
+    auto search = make_unique<TRAStar>(space, heuristic, forward_search);
+
+    double epsilon;
+    space->params()->param("epsilon", epsilon, 1.0);
+    search->set_initialsolution_eps(epsilon);
+
+    bool search_mode;
+    space->params()->param("search_mode", search_mode, false);
+    search->set_search_mode(search_mode);
+
+    bool allow_partial_solutions;
+    if (space->params()->getParam("allow_partial_solutions", allow_partial_solutions)) {
+        search->allowPartialSolutions(allow_partial_solutions);
+    }
+
+    /*double target_eps;
+    if (space->params()->getParam("target_epsilon", target_eps)) {
+        search->setTargetEpsilon(target_eps);
+    }
+
+    double delta_eps;
+    if (space->params()->getParam("delta_epsilon", delta_eps)) {
+        search->setDeltaEpsilon(delta_eps);
+    }
+
+    bool improve_solution;
+    if (space->params()->getParam("improve_solution", improve_solution)) {
+        search->setImproveSolution(improve_solution);
+    }
+
+    bool bound_expansions;
+    if (space->params()->getParam("bound_expansions", bound_expansions)) {
+        search->setBoundExpansions(bound_expansions);
+    }*/
+
+    double repair_time;
+    if (space->params()->getParam("repair_time", repair_time)) {
+        search->setAllowedRepairTime(repair_time);
+    }
+    return std::move(search);
+}
+
+auto MakeMARAStar(RobotPlanningSpace* space, RobotHeuristic* heuristic)
+    -> std::unique_ptr<SBPLPlanner>
+{
+    const bool forward_search = true;
+    auto search = make_unique<MARAStar>(space, heuristic);
+
+    double epsilon;
+    space->params()->param("epsilon", epsilon, 1.0);
+    search->set_initialsolution_eps(epsilon);
+
+    bool search_mode;
+    space->params()->param("search_mode", search_mode, false);
+    search->set_search_mode(search_mode);
+
+    bool allow_partial_solutions;
+    if (space->params()->getParam("allow_partial_solutions", allow_partial_solutions)) {
+        search->allowPartialSolutions(allow_partial_solutions);
+    }
+
+    double target_eps;
+    if (space->params()->getParam("target_epsilon", target_eps)) {
+        search->setTargetEpsilon(target_eps);
+    }
+
+    double delta_eps;
+    if (space->params()->getParam("delta_epsilon", delta_eps)) {
+        search->setDeltaEpsilon(delta_eps);
+    }
+
+    bool improve_solution;
+    if (space->params()->getParam("improve_solution", improve_solution)) {
+        search->setImproveSolution(improve_solution);
+    }
+
+    bool bound_expansions;
+    if (space->params()->getParam("bound_expansions", bound_expansions)) {
+        search->setBoundExpansions(bound_expansions);
+    }
+
+    double repair_time;
+    if (space->params()->getParam("repair_time", repair_time)) {
+        search->setAllowedRepairTime(repair_time);
+    }
+
+    double switch_dist;
+    if (space->params()->getParam("switch_dist", switch_dist)) {
+        search->setSwitchDistance(switch_dist);
+    }
+
     return std::move(search);
 }
 
@@ -712,6 +828,10 @@ PlannerInterface::PlannerInterface(
         return MakeBFSHeuristic(space, m_grid, m_params);
     };
 
+     m_heuristic_factories["mbfs"] = [this](RobotPlanningSpace* space) {
+        return MakeMultiBFSHeuristic(space, m_grid, m_params);
+    };
+
     m_heuristic_factories["euclid"] = [this](RobotPlanningSpace* space) {
         return MakeEuclidDistHeuristic(space, m_params);
     };
@@ -737,6 +857,8 @@ PlannerInterface::PlannerInterface(
     m_planner_factories["larastar"] = MakeLARAStar;
     m_planner_factories["egwastar"] = MakeEGWAStar;
     m_planner_factories["padastar"] = MakePADAStar;
+    m_planner_factories["trastar"] = MakeTRAStar;
+    m_planner_factories["marastar"] = MakeMARAStar;
 }
 
 PlannerInterface::~PlannerInterface()
@@ -1103,8 +1225,8 @@ bool PlannerInterface::plan(double allowed_time, std::vector<RobotState>& path)
     // NOTE: this should be done after setting the start/goal in the environment
     // to allow the heuristic to tailor the visualization to the current
     // scenario
-    SV_SHOW_DEBUG(getBfsWallsVisualization());
-    SV_SHOW_DEBUG(getBfsValuesVisualization());
+    SV_SHOW_INFO(getBfsWallsVisualization());
+    SV_SHOW_INFO(getBfsValuesVisualization());
 
     ROS_WARN_NAMED(PI_LOGGER, "Planning!!!!!");
     bool b_ret = false;

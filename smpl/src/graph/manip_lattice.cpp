@@ -213,12 +213,106 @@ void ManipLattice::GetSuccs(
     SMPL_DEBUG_STREAM_NAMED(params()->expands_log, "  angles: " << parent_entry->state);
     SMPL_DEBUG_NAMED(params()->expands_log, "  heur: %d", GetGoalHeuristic(state_id));
 
-    SV_SHOW_INFO(getStateVisualization(parent_entry->state, "expansion"));
+    //SV_SHOW_INFO(getStateVisualization(parent_entry->state, "expansion"));
 
     int goal_succ_count = 0;
 
     std::vector<Action> actions;
-    if (!m_actions->apply(parent_entry->state, actions)) {
+    ActionsWeight weights;
+    if (!m_actions->apply(parent_entry->state, actions,weights,-1)) {
+        SMPL_WARN("Failed to get actions");
+        return;
+    }
+
+    SMPL_DEBUG_NAMED(params()->expands_log, "  actions: %zu", actions.size());
+
+    // check actions for validity
+    RobotCoord succ_coord(robot()->jointVariableCount(), 0);
+    for (size_t i = 0; i < actions.size(); ++i) {
+        const Action& action = actions[i];
+
+        SMPL_DEBUG_NAMED(params()->expands_log, "    action %zu:", i);
+        SMPL_DEBUG_NAMED(params()->expands_log, "      waypoints: %zu", action.size());
+
+        if (!checkAction(parent_entry->state, action)) {
+            continue;
+        }
+
+        // compute destination coords
+        stateToCoord(action.back(), succ_coord);
+
+        // get the successor
+
+        // check if hash entry already exists, if not then create one
+        int succ_state_id = getOrCreateState(succ_coord, action.back());
+        ManipLatticeState* succ_entry = getHashEntry(succ_state_id);
+
+        // check if this state meets the goal criteria
+        const bool is_goal_succ = isGoal(action.back());
+        if (is_goal_succ) {
+            // update goal state
+            SMPL_WARN("increasing goal succ!");
+            ++goal_succ_count;
+        }
+
+        // put successor on successor list with the proper cost
+        if (is_goal_succ) {
+            succs->push_back(m_goal_state_id);
+        } else {
+            succs->push_back(succ_state_id);
+        }
+        costs->push_back(cost(parent_entry, succ_entry, weights[i], is_goal_succ));
+
+        // log successor details
+        SMPL_DEBUG_NAMED(params()->expands_log, "      succ: %zu", i);
+        SMPL_DEBUG_NAMED(params()->expands_log, "        id: %5i", succ_state_id);
+        SMPL_DEBUG_STREAM_NAMED(params()->expands_log, "        coord: " << succ_coord);
+        SMPL_DEBUG_STREAM_NAMED(params()->expands_log, "        state: " << succ_entry->state);
+        SMPL_DEBUG_NAMED(params()->expands_log, "        heur: %2d", GetGoalHeuristic(succ_state_id));
+        SMPL_DEBUG_NAMED(params()->expands_log, "        cost: %5d", cost(parent_entry, succ_entry, is_goal_succ));
+    }
+
+    if (goal_succ_count > 0) {
+        SMPL_DEBUG_NAMED(params()->expands_log, "Got %d goal successors!", goal_succ_count);
+    }
+    //ROS_ERROR_STREAM("Expanded node iD is "<<state_id);
+    //m_expanded_states.push_back(state_id);
+    //std::getchar();
+}
+
+void ManipLattice::GetSuccsByGroup(
+        int state_id,
+        std::vector<int>* succs,
+        std::vector<int>* costs, int group)
+{
+    assert(state_id >= 0 && state_id < m_states.size() && "state id out of bounds");
+    assert(succs && costs && "successor buffer is null");
+    assert(m_actions && "action space is uninitialized");
+
+    SMPL_DEBUG_NAMED(params()->expands_log, "expanding state %d", state_id);
+
+    // goal state should be absorbing
+    if (state_id == m_goal_state_id) {
+        return;
+    }
+
+    ManipLatticeState* parent_entry = m_states[state_id];
+
+    assert(parent_entry);
+    assert(parent_entry->coord.size() >= robot()->jointVariableCount());
+
+    // log expanded state details
+    SMPL_DEBUG_STREAM_NAMED(params()->expands_log, "  coord: " << parent_entry->coord);
+    SMPL_DEBUG_STREAM_NAMED(params()->expands_log, "  angles: " << parent_entry->state);
+    SMPL_DEBUG_NAMED(params()->expands_log, "  heur: %d", GetGoalHeuristic(state_id));
+
+    //SV_SHOW_INFO(getStateVisualization(parent_entry->state, "expansion"));
+
+    int goal_succ_count = 0;
+
+    std::vector<Action> actions;
+    ActionsWeight weights;
+    if (!m_actions->apply(parent_entry->state, actions, weights, group)) {
         SMPL_WARN("Failed to get actions");
         return;
     }
@@ -259,7 +353,7 @@ void ManipLattice::GetSuccs(
         } else {
             succs->push_back(succ_state_id);
         }
-        costs->push_back(cost(parent_entry, succ_entry, is_goal_succ));
+        costs->push_back(cost(parent_entry, succ_entry, weights[i], is_goal_succ));
 
         // log successor details
         SMPL_DEBUG_NAMED(params()->expands_log, "      succ: %zu", i);
@@ -273,9 +367,6 @@ void ManipLattice::GetSuccs(
     if (goal_succ_count > 0) {
         SMPL_DEBUG_NAMED(params()->expands_log, "Got %d goal successors!", goal_succ_count);
     }
-    //ROS_ERROR_STREAM("Expanded node iD is "<<state_id);
-    //m_expanded_states.push_back(state_id);
-    //std::getchar();
 }
 
 Stopwatch GetLazySuccsStopwatch("GetLazySuccs", 10);
@@ -366,7 +457,7 @@ int ManipLattice::GetTrueCost(int parentID, int childID)
     GetTrueCostStopwatch.start();
     PROFAUTOSTOP(GetTrueCostStopwatch);
 
-    SMPL_DEBUG_NAMED(params()->expands_log, "evaluating cost of transition %d -> %d", parentID, childID);
+    SMPL_ERROR_NAMED(params()->expands_log, "evaluating cost of transition %d -> %d", parentID, childID);
 
     assert(parentID >= 0 && parentID < (int)m_states.size());
     assert(childID >= 0 && childID < (int)m_states.size());
@@ -422,7 +513,7 @@ int ManipLattice::GetTrueCost(int parentID, int childID)
         ManipLatticeState* succ_entry = getHashEntry(succ_state_id);
         assert(succ_entry);
 
-        const int edge_cost = cost(parent_entry, succ_entry, goal_edge);
+        const int edge_cost = cost(parent_entry, succ_entry, 1, goal_edge);
         if (edge_cost < best_cost) {
             best_cost = edge_cost;
         }
@@ -622,6 +713,16 @@ int ManipLattice::cost(
     return DefaultCostMultiplier;
 }
 
+int ManipLattice::cost(
+    ManipLatticeState* HashEntry1,
+    ManipLatticeState* HashEntry2,
+    double actionWeight,
+    bool bState2IsGoal) const
+{
+    const int DefaultCostMultiplier = 1000;
+    return DefaultCostMultiplier*actionWeight;
+}
+
 bool ManipLattice::checkAction(const RobotState& state, const Action& action)
 {
     std::uint32_t violation_mask = 0x00000000;
@@ -722,7 +823,7 @@ bool ManipLattice::isGoal(const RobotState& state)
                 auto time_to_goal_s =
                         duration_cast<duration<double>>(time_to_goal_region);
                 m_near_goal = true;
-                SMPL_INFO_NAMED(params()->expands_log, "Search is at %0.2f %0.2f %0.2f, within %0.3fm of the goal (%0.2f %0.2f %0.2f) after %0.4f sec.",
+                SMPL_DEBUG_NAMED(params()->expands_log, "Search is at %0.2f %0.2f %0.2f, within %0.3fm of the goal (%0.2f %0.2f %0.2f) after %0.4f sec.",
                         pose[0], pose[1], pose[2],
                         goal().xyz_tolerance[0],
                         goal().tgt_off_pose[0], goal().tgt_off_pose[1], goal().tgt_off_pose[2],
@@ -742,6 +843,7 @@ bool ManipLattice::isGoal(const RobotState& state)
 
 //            const double theta = angles::normalize_angle(Eigen::AngleAxisd(qg.conjugate() * q).angle());
             const double theta = angles::normalize_angle(2.0 * acos(q.dot(qg)));
+            //SMPL_WARN_STREAM("Theta vs. goal tolerance "<<theta<<","<<goal().rpy_tolerance[0]);
             if (theta < goal().rpy_tolerance[0]) {
                 return true;
             }
@@ -770,6 +872,97 @@ bool ManipLattice::isGoal(const RobotState& state)
     }
 
     return false;
+}
+
+sbpl::motion::GroupType ManipLattice::switchPlanningGroup(int state_id, double switchThreshold)
+{
+    RobotState state = m_states[state_id]->state;
+    switch (goal().type) {
+    case GoalType::JOINT_STATE_GOAL:
+    {
+        for (int i = 0; i < goal().angles.size(); i++) {
+            if (fabs(state[i] - goal().angles[i]) > switchThreshold) {
+                return sbpl::motion::GroupType::BASE;
+            }
+        }
+        return sbpl::motion::GroupType::ARM;
+    }   break;
+    case GoalType::XYZ_RPY_GOAL:
+    {
+        // get pose of planning link
+        std::vector<double> pose;
+        if (!computePlanningFrameFK(state, pose)) {
+            SMPL_WARN("Failed to compute FK for planning frame");
+            return sbpl::motion::GroupType::FAILURE;
+        }
+
+        const double dx = fabs(pose[0] - goal().tgt_off_pose[0]);
+        const double dy = fabs(pose[1] - goal().tgt_off_pose[1]);
+        const double dz = fabs(pose[2] - goal().tgt_off_pose[2]);
+        if (dx <= switchThreshold &&
+            dy <= switchThreshold &&
+            dz <= switchThreshold)
+        {
+            // log the amount of time required for the search to get close to the goal
+            if (!m_near_goal) {
+                using namespace std::chrono;
+                auto time_to_goal_region = clock::now() - m_t_start;
+                auto time_to_goal_s =
+                        duration_cast<duration<double>>(time_to_goal_region);
+                m_near_goal = true;
+                SMPL_DEBUG_NAMED(params()->expands_log, "Switching Group Search is at %0.2f %0.2f %0.2f, within %0.3fm of the goal (%0.2f %0.2f %0.2f) after %0.4f sec.",
+                        pose[0], pose[1], pose[2],
+                        goal().xyz_tolerance[0],
+                        goal().tgt_off_pose[0], goal().tgt_off_pose[1], goal().tgt_off_pose[2],
+                        time_to_goal_s.count());
+            }
+            Eigen::Quaterniond qg(
+                    Eigen::AngleAxisd(goal().tgt_off_pose[5], Eigen::Vector3d::UnitZ()) *
+                    Eigen::AngleAxisd(goal().tgt_off_pose[4], Eigen::Vector3d::UnitY()) *
+                    Eigen::AngleAxisd(goal().tgt_off_pose[3], Eigen::Vector3d::UnitX()));
+            Eigen::Quaterniond q(
+                    Eigen::AngleAxisd(pose[5], Eigen::Vector3d::UnitZ()) *
+                    Eigen::AngleAxisd(pose[4], Eigen::Vector3d::UnitY()) *
+                    Eigen::AngleAxisd(pose[3], Eigen::Vector3d::UnitX()));
+            if (q.dot(qg) < 0.0) {
+                qg = Eigen::Quaterniond(-qg.w(), -qg.x(), -qg.y(), -qg.z());
+            }
+
+            const double theta = angles::normalize_angle(2.0 * acos(q.dot(qg)));
+            if (theta < switchThreshold) {
+                return sbpl::motion::GroupType::ARM;
+            }
+            else
+                return sbpl::motion::GroupType::BASE;
+        }
+        else
+            return sbpl::motion::GroupType::BASE;
+    }   break;
+    case GoalType::XYZ_GOAL:
+    {
+        // get pose of planning link
+        std::vector<double> pose;
+        if (!computePlanningFrameFK(state, pose)) {
+            SMPL_WARN("Failed to compute FK for planning frame");
+            return sbpl::motion::GroupType::FAILURE;
+        }
+
+        if (fabs(pose[0] - goal().tgt_off_pose[0]) <= switchThreshold &&
+            fabs(pose[1] - goal().tgt_off_pose[1]) <= switchThreshold &&
+            fabs(pose[2] - goal().tgt_off_pose[2]) <= switchThreshold)
+        {
+            return sbpl::motion::GroupType::ARM;
+        }
+        else
+            return sbpl::motion::GroupType::BASE;
+    }   break;
+    default:
+    {
+        SMPL_ERROR_NAMED(params()->graph_log, "Unknown goal type.");
+    }   break;
+    }
+
+    return sbpl::motion::GroupType::FAILURE;
 }
 
 auto ManipLattice::getStateVisualization(

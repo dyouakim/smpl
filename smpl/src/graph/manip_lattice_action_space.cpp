@@ -42,6 +42,7 @@
 #include <smpl/graph/manip_lattice.h>
 #include <smpl/heuristic/robot_heuristic.h>
 
+
 namespace sbpl {
 namespace motion {
 
@@ -72,6 +73,7 @@ bool ManipLatticeActionSpace::init(ManipLattice* space)
     }
 
     useMultipleIkSolutions(false);
+    useLongAndShortPrims(false);
     useAmp(MotionPrimitive::SNAP_TO_XYZ, false);
     useAmp(MotionPrimitive::SNAP_TO_RPY, false);
     useAmp(MotionPrimitive::SNAP_TO_XYZ_RPY, false);
@@ -101,6 +103,7 @@ bool ManipLatticeActionSpace::init(ManipLattice* space)
 bool ManipLatticeActionSpace::load(const std::string& action_filename)
 {
     FILE* fCfg = fopen(action_filename.c_str(), "r");
+
     if (!fCfg) {
         SMPL_ERROR("Failed to open action set file. (file: '%s')", action_filename.c_str());
         return false;
@@ -142,19 +145,19 @@ bool ManipLatticeActionSpace::load(const std::string& action_filename)
     if (short_mprims == nrows) {
         SMPL_WARN("# of motion prims == # of short distance motion prims. No long distance motion prims set.");
     }
-
-    std::vector<double> mprim(ncols, 0);
+ 
+    std::vector<double> mprim(ncols-2, 0);
 
     bool have_short_dist_mprims = short_mprims > 0;
-    if (have_short_dist_mprims) {
+    /*if (have_short_dist_mprims) {
         useAmp(MotionPrimitive::SHORT_DISTANCE, true);
-    }
+    }*/
 
     ManipLattice* lattice = static_cast<ManipLattice*>(planningSpace());
-
+    
     for (int i = 0; i < nrows; ++i) {
         // read joint delta
-        for (int j = 0; j < ncols; ++j) {
+        for (int j = 0; j < ncols-2; ++j) {
             double d;
             if (fscanf(fCfg, "%lf", &d) < 1)  {
                 SMPL_ERROR("Parsed string has length < 1.");
@@ -164,17 +167,29 @@ bool ManipLatticeActionSpace::load(const std::string& action_filename)
                 SMPL_ERROR("End of parameter file reached prematurely. Check for newline.");
                 return false;
             }
+
             mprim[j] = d * lattice->resolutions()[j];
             SMPL_DEBUG("Got %0.3f deg -> %0.3f rad", d, mprim[j]);
         }
 
+        int group;
+        if(fscanf(fCfg, "%i", &group)<1)
+        {
+            SMPL_ERROR("No planning group defiend for this MP!");
+        }
+
+        double weight;
+        if(fscanf(fCfg, "%lf", &weight)<1)
+        {
+            SMPL_ERROR("No weight defiend for this MP!");
+        }
+
         if (i < (nrows - short_mprims)) {
-            addMotionPrim(mprim, false);
+            addMotionPrim(mprim, group, weight, false);
         } else {
-            addMotionPrim(mprim, true);
+            addMotionPrim(mprim, group, weight, true);
         }
     }
-
     fclose(fCfg);
     return true;
 }
@@ -185,7 +200,7 @@ bool ManipLatticeActionSpace::load(const std::string& action_filename)
 /// \param add_converse Whether to add the negative of this motion primitive
 ///     to the action set
 void ManipLatticeActionSpace::addMotionPrim(
-    const std::vector<double>& mprim,
+    const std::vector<double>& mprim, int group, double weight, 
     bool short_dist_mprim,
     bool add_converse)
 {
@@ -196,10 +211,10 @@ void ManipLatticeActionSpace::addMotionPrim(
     } else {
         m.type = MotionPrimitive::LONG_DISTANCE;
     }
-
     m.action.push_back(mprim);
+    m.group = sbpl::motion::GroupType(group);
+    m.weight = weight;
     m_mprims.push_back(m);
-
     if (add_converse) {
         for (RobotState& state : m.action) {
             for (size_t i = 0; i < state.size(); ++i) {
@@ -208,6 +223,7 @@ void ManipLatticeActionSpace::addMotionPrim(
         }
         m_mprims.push_back(m);
     }
+
 }
 
 /// \brief Remove long and short motion primitives and disable adaptive motions.
@@ -222,14 +238,20 @@ void ManipLatticeActionSpace::clear()
 
     mprim.type = MotionPrimitive::SNAP_TO_RPY;
     mprim.action.clear();
+    mprim.group = sbpl::motion::GroupType::ANY;
+    mprim.weight = 0.5;
     m_mprims.push_back(mprim);
 
     mprim.type = MotionPrimitive::SNAP_TO_XYZ;
     mprim.action.clear();
+    mprim.group = sbpl::motion::GroupType::ANY;
+    mprim.weight = 0.5;
     m_mprims.push_back(mprim);
 
     mprim.type = MotionPrimitive::SNAP_TO_XYZ_RPY;
     mprim.action.clear();
+    mprim.group = sbpl::motion::GroupType::ANY;
+    mprim.weight = 0.5;
     m_mprims.push_back(mprim);
 
     for (int i = 0; i < MotionPrimitive::NUMBER_OF_MPRIM_TYPES; ++i) {
@@ -350,9 +372,65 @@ bool ManipLatticeActionSpace::apply(
 
     std::vector<Action> act;
     for (const MotionPrimitive& prim : m_mprims) {
-        act.clear();
-        if (getAction(parent, goal_dist, start_dist, prim, act)) {
-            actions.insert(actions.end(), act.begin(), act.end());
+    act.clear();
+    if (getAction(parent, goal_dist, start_dist, prim, act)) {
+        actions.insert(actions.end(), act.begin(), act.end());
+    }
+    }
+    if (actions.empty()) {
+        SMPL_WARN_ONCE("No motion primitives specified");
+    }
+
+    return true;
+}
+
+bool ManipLatticeActionSpace::apply(
+    const RobotState& parent,
+    std::vector<Action>& actions, ActionsWeight& weights, int group)
+{
+    if (!m_fk_iface) {
+        return false;
+    }
+
+    std::vector<double> pose;
+    if (!m_fk_iface->computePlanningLinkFK(parent, pose)) {
+        SMPL_ERROR("Failed to compute forward kinematics for planning link");
+        return false;
+    }
+
+    // get distance to the goal pose
+    double goal_dist = 0.0;
+    double start_dist = 0.0;
+    if (planningSpace()->numHeuristics() > 0) {
+        RobotHeuristic* h = planningSpace()->heuristic(0);
+        goal_dist = h->getMetricGoalDistance(pose[0], pose[1], pose[2]);
+        start_dist = h->getMetricStartDistance(pose[0], pose[1], pose[2]);
+    }
+
+    std::vector<Action> act;
+    if(group!=-1)
+    {
+        std::for_each( m_mprims.begin(), m_mprims.end(),
+        [&](MotionPrimitive& mp ) mutable
+           {
+             if( mp.group == sbpl::motion::GroupType(group) || mp.group == sbpl::motion::GroupType::ANY)
+             { 
+               act.clear();
+               if (getAction(parent, goal_dist, start_dist, mp, act)) {
+                actions.insert(actions.end(), act.begin(), act.end());
+                weights.push_back(mp.weight);
+                }
+             }
+            } );
+    }
+    else
+    {
+        for (const MotionPrimitive& prim : m_mprims) {
+            act.clear();
+            if (getAction(parent, goal_dist, start_dist, prim, act)) {
+                actions.insert(actions.end(), act.begin(), act.end());
+                weights.push_back(prim.weight);
+            }
         }
     }
 
@@ -360,8 +438,18 @@ bool ManipLatticeActionSpace::apply(
         SMPL_WARN_ONCE("No motion primitives specified");
     }
 
+    /*for(int i=0;i<actions.size();i++){
+        for(int j=0;j<actions[i].size();j++)
+        {
+            //SMPL_WARN("actions of[%i][%i] found of size %i",i,j,actions.size());
+            for(int k=0;k<(actions[i][j]).size();k++)
+            SMPL_INFO_STREAM("Action ["<<i<<"]["<<j<<"]["<<k<<" is "<<actions[i][j][k]);
+        }
+    }*/
+
     return true;
 }
+
 
 bool ManipLatticeActionSpace::getAction(
     const RobotState& parent,
@@ -373,7 +461,7 @@ bool ManipLatticeActionSpace::getAction(
     if (!mprimActive(start_dist, goal_dist, mp.type)) {
         return false;
     }
-
+    //SMPL_INFO_STREAM("GetAction: check MP type "<<mp.type<<" and "<<mp.group);
     GoalType goal_type = planningSpace()->goal().type;
     const std::vector<double>& goal_pose = planningSpace()->goal().pose;
 
@@ -436,7 +524,7 @@ bool ManipLatticeActionSpace::applyMotionPrimitive(
     const MotionPrimitive& mp,
     Action& action)
 {
-    action = mp.action;
+     action = mp.action;
     for (size_t i = 0; i < action.size(); ++i) {
         if (action[i].size() != state.size()) {
             return false;
@@ -444,6 +532,7 @@ bool ManipLatticeActionSpace::applyMotionPrimitive(
 
         for (size_t j = 0; j < action[i].size(); ++j) {
             action[i][j] = action[i][j] + state[j];
+   
         }
     }
     return true;

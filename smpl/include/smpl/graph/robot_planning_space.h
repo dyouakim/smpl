@@ -125,6 +125,11 @@ public:
         std::vector<int>* succs,
         std::vector<int>* costs) override = 0;
 
+    virtual void GetSuccsByGroup(
+        int state_id,
+        std::vector<int>* succs,
+        std::vector<int>* costs, int group) override;
+
     virtual void GetPreds(
         int state_id,
         std::vector<int>* preds,

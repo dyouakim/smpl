@@ -173,6 +173,13 @@ public:
         std::vector<int>* costs) override;
     ///@}
 
+    void GetSuccsByGroup(
+        int state_id,
+        std::vector<int>* succs,
+        std::vector<int>* costs, int group) override;
+
+    sbpl::motion::GroupType switchPlanningGroup(int state_id, double switchThreshold);
+
 protected:
 
     /// \name discretization methods
@@ -195,6 +202,12 @@ protected:
     int cost(
         ManipLatticeState* HashEntry1,
         ManipLatticeState* HashEntry2,
+        bool bState2IsGoal) const;
+
+    int cost(
+        ManipLatticeState* HashEntry1,
+        ManipLatticeState* HashEntry2,
+        double actionWeight,
         bool bState2IsGoal) const;
 
     bool checkAction(const RobotState& state, const Action& action);
