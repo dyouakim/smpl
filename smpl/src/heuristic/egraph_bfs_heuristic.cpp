@@ -539,13 +539,15 @@ void DijkstraEgraphHeuristic3D::projectExperienceGraph()
     color.b = (float)0x00 / (float)0xFF;
     color.a = 1.0f;
 
-    auto vis = visual::MakeCubesMarker(
-            std::move(viz_points),
-            grid()->resolution(),
-            color,
-            grid()->getReferenceFrame(),
-            "egraph_projection");
-    SV_SHOW_INFO(vis);
+    auto* vis_name = "egraph_projection";
+    SV_SHOW_INFO_NAMED(
+            vis_name,
+            visual::MakeCubesMarker(
+                    std::move(viz_points),
+                    grid()->resolution(),
+                    color,
+                    grid()->getReferenceFrame(),
+                    vis_name));
 }
 
 int DijkstraEgraphHeuristic3D::getGoalHeuristic(const Eigen::Vector3i& dp)

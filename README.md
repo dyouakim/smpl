@@ -1,8 +1,8 @@
-# sbpl_manipulation
+# Search-Based Motion Planning Library
 
 ## Overview
 
-A set of packages implementing sbpl algorithms for generic robotic motion planning. Includes the following packages:
+A set of packages implementing generic heuristic search algorithms for robotic motion planning. Includes the following packages:
 
 * smpl - Provides a library of discrete graph representations of robot configuration spaces, heuristics defined over those representations, and an interface to cleanly integrate them into the sbpl planning framework. Also provides library interfaces to extend the framework to use arbitrary robot representations and collision checking.
 * smpl_test - Provides self-contained examples to illustrate usage of the interfaces provided in the smpl package.
@@ -13,13 +13,13 @@ A set of packages implementing sbpl algorithms for generic robotic motion planni
 ## Before you begin
 
 Install ROS Indigo by following the instructions at www.ros.org and follow the
-tutorials to create a catkin workspace to build sbpl_manipulation within.
+tutorials to create a catkin workspace to build smpl within.
 
 ## Installation
 
 ### Install SBPL from Source
 
-sbpl_manipulation requires the latest sbpl to be installed. Because of catkin's preference for packages in your current catkin workspace or parent catkin workspaces, you may need to remove any binary packages that provide sbpl, such as ros-_distro_-sbpl, to avoid catkin attempting to build against it.
+SMPL requires the latest SBPL to be installed. Because catkin prefers to find packages in your current and parent workspaces, you may need to remove any binary packages that provide SBPL, e.g. ros-_distro_-sbpl, to prevent catkin from giving it higher priority.
 
 	git clone https://github.com/sbpl/sbpl
 	cd sbpl && mkdir build && cd build && cmake .. && make && sudo make install
@@ -45,4 +45,4 @@ sbpl_manipulation requires the latest sbpl to be installed. Because of catkin's 
 
 ## Running
 
-Coming soon
+Coming "soon"

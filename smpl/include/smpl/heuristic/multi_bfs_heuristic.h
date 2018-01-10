@@ -10,6 +10,10 @@
 #include <smpl/debug/marker.h>
 #include <smpl/heuristic/robot_heuristic.h>
 
+#include <tf/transform_listener.h>
+
+#include <tf_conversions/tf_eigen.h>
+
 namespace sbpl {
 namespace motion {
 
@@ -54,17 +58,16 @@ public:
     /// \name Required Public Functions from Heuristic
     ///@{
     int GetGoalHeuristic(int state_id);
-    int GetGoalHeuristic(int state_id, GroupType planning_group);
+    int GetGoalHeuristic(int state_id, int planning_group, int base_heuristic_idx);
     int GetStartHeuristic(int state_id);
-    int GetFromToHeuristic(int from_id, int to_id);
-    int GetFromToHeuristic(int from_id, int to_id, GroupType planning_group);
+    int GetFromToHeuristic(int from_id, int to_id); 
     ///@}
 
 private:
 
     const OccupancyGrid* m_grid = nullptr;
 
-    std::unique_ptr<BFS_3D> m_bfs, m_base_bfs;
+    std::vector<std::unique_ptr<BFS_3D>> m_bfs;
     PointProjectionExtension* m_pp = nullptr;
 
     double m_inflation_radius = 0.0;
@@ -76,8 +79,9 @@ private:
     int m_goal_z = -1;
 
     void syncGridAndBfs();
-    int getBfsCostToGoal(const BFS_3D& bfs, int x, int y, int z,GroupType planning_group) const;
+    //int getBfsCostToGoal(const BFS_3D& bfs, int x, int y, int z,GroupType planning_group) const;
     int getBfsCostToGoal(const BFS_3D& bfs, int x, int y, int z) const;
+
 };
 
 } // namespace motion

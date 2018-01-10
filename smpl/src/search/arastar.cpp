@@ -348,7 +348,7 @@ void ARAStar::get_search_stats(std::vector<PlannerStats>* s)
 {
     PlannerStats stats;
     stats.eps = m_curr_eps;
-    stats.cost;
+//    stats.cost; // TODO: implement
     stats.expands = m_expand_count;
     stats.time = to_seconds(m_search_time);
     s->push_back(stats);

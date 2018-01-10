@@ -170,12 +170,14 @@ bool WorkspaceLattice::setStart(const RobotState& state)
     }
 
     if (!collisionChecker()->isStateValid(state, true)) {
-        SV_SHOW_WARN(collisionChecker()->getCollisionModelVisualization(state));
+        auto* vis_name = "invalid_start";
+        SV_SHOW_WARN_NAMED(vis_name, collisionChecker()->getCollisionModelVisualization(state));
         SMPL_WARN("start state is in collision");
         return false;
     }
 
-    SV_SHOW_INFO(getStateVisualization(state, "start_config"));
+    auto* vis_name = "start_config";
+    SV_SHOW_INFO_NAMED(vis_name, getStateVisualization(state, vis_name));
     WorkspaceCoord start_coord;
     stateRobotToCoord(state, start_coord);
 
@@ -260,7 +262,8 @@ bool WorkspaceLattice::extractPath(
             //eePath.push_back(eePose);
         }
 
-        SV_SHOW_INFO(getStateVisualization(path.back(), "goal_state"));
+        auto* vis_name = "goal_config";
+        SV_SHOW_INFO_NAMED(vis_name, getStateVisualization(path.back(), vis_name));
         return true;
     }
 
@@ -384,7 +387,8 @@ void WorkspaceLattice::GetSuccs(
     SMPL_DEBUG_STREAM_NAMED(params()->expands_log, "  coord: " << parent_entry->coord);
     SMPL_DEBUG_STREAM_NAMED(params()->expands_log, "  state: " << parent_entry->state);
 
-    SV_SHOW_INFO(getStateVisualization(parent_entry->state, "expansion"));
+    auto* vis_name = "expansion";
+    SV_SHOW_DEBUG_NAMED(vis_name, getStateVisualization(parent_entry->state, vis_name));
 
     std::vector<Action> actions;
     getActions(*parent_entry, actions);
@@ -490,7 +494,8 @@ void WorkspaceLattice::GetLazySuccs(
     SMPL_DEBUG_STREAM_NAMED(params()->expands_log, "  coord: " << state_entry->coord);
     SMPL_DEBUG_STREAM_NAMED(params()->expands_log, "  state: " << state_entry->state);
 
-    SV_SHOW_DEBUG(getStateVisualization(state_entry->state, "expansion"));
+    auto* vis_name = "expansion";
+    SV_SHOW_DEBUG_NAMED(vis_name, getStateVisualization(state_entry->state, vis_name));
 
     std::vector<Action> actions;
     getActions(*state_entry, actions);
@@ -677,7 +682,8 @@ bool WorkspaceLattice::setGoalPose(const GoalConstraint& goal)
             Eigen::AngleAxisd(goal.tgt_off_pose[5], Eigen::Vector3d::UnitZ()) *
             Eigen::AngleAxisd(goal.tgt_off_pose[4], Eigen::Vector3d::UnitY()) *
             Eigen::AngleAxisd(goal.tgt_off_pose[3], Eigen::Vector3d::UnitX()));
-    SV_SHOW_INFO(visual::MakePoseMarkers(goal_pose, m_viz_frame_id, "target_goal"));
+    auto* vis_name = "goal_pose";
+    SV_SHOW_INFO_NAMED(vis_name, visual::MakePoseMarkers(goal_pose, m_viz_frame_id, vis_name));
 
     SMPL_DEBUG_NAMED(params()->graph_log, "set the goal state");
 

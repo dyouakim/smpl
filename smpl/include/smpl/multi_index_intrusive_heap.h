@@ -4,7 +4,7 @@
 
 #include <cstdlib>
 #include <vector>
-
+#include <smpl/console/console.h>
 namespace sbpl {
 
 template <class T, class Compare>
@@ -13,10 +13,10 @@ class multi_index_intrusive_heap;
 struct multi_index_heap_element
 {
 
-    multi_index_heap_element() { m_heap_index[0]=0; m_heap_index[1]=0; }
-
+    multi_index_heap_element() : m_heap_index({0,0}) { }
+        
+        
 private:
-
     std::size_t m_heap_index[2];
 
     template <class T, class Compare>

@@ -160,11 +160,19 @@ enum GoalType
 enum GroupType
 {
     FAILURE = -2,
-    ANY, 
-    BASE,
-    ARM
+    ANY = -1, 
+    BASE = 0,
+    ARM = 1
 } ;
 
+enum BaseGroupHeuristic
+{
+    NONE = -1,
+    B1,
+    B2,
+    B3,
+    B4
+};
 
 struct GoalConstraint
 {

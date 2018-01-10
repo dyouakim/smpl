@@ -1,5 +1,5 @@
 ////////////////////////////////////////////////////////////////////////////////
-// Copyright (c) 2010, Benjamin Cohen
+// Copyright (c) 2017, Andrew Dornbush
 // All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
@@ -27,75 +27,51 @@
 // POSSIBILITY OF SUCH DAMAGE.
 ////////////////////////////////////////////////////////////////////////////////
 
-/// \author Benjamin Cohen
+/// \author Andrew Dornbush
 
-#ifndef sbpl_manip_pr2_kdl_robot_model_h
-#define sbpl_manip_pr2_kdl_robot_model_h
-
-// standard includes
-#include <memory>
-#include <string>
 #include <vector>
 
-// system includes
-#include <kdl/chain.hpp>
-#include <kdl/chainfksolverpos_recursive.hpp>
-#include <kdl/chainiksolverpos_nr_jl.hpp>
-#include <kdl/chainiksolvervel_pinv.hpp>
-#include <kdl/frames.hpp>
-#include <kdl/jntarray.hpp>
-#include <pr2_arm_kinematics/pr2_arm_ik_solver.h>
-#include <ros/console.h>
-#include <sbpl_kdl_robot_model/kdl_robot_model.h>
-#include <urdf/model.h>
-
-// project includes
-#include <sbpl_pr2_robot_model/orientation_solver.h>
-
 namespace sbpl {
-namespace motion {
 
-class PR2KDLRobotModel : public KDLRobotModel
-{
-public:
+struct ISuccFun {
+    virtual ~ISuccFun() { }
 
-    PR2KDLRobotModel();
-
-    ~PR2KDLRobotModel();
-
-    /// \name Reimplemented Functions from KDLRobotModel
-    ///@{
-    bool init(
-        const std::string& robot_description,
-        const std::vector<std::string>& planning_joints,
-        const std::string& chain_root_link,
-        const std::string& chain_tip_link,
-        int free_angle = DEFAULT_FREE_ANGLE_INDEX) override;
-
-    bool computeIK(
-        const std::vector<double>& pose,
-        const std::vector<double>& start,
-        std::vector<double>& solution,
-        ik_option::IkOption option = ik_option::UNRESTRICTED) override;
-
-    bool computeFastIK(
-        const std::vector<double>& pose,
-        const std::vector<double>& start,
-        std::vector<double>& solution) override;
-    ///@}
-
-private:
-
-    std::unique_ptr<pr2_arm_kinematics::PR2ArmIKSolver> pr2_ik_solver_;
-
-    std::unique_ptr<RPYSolver> rpy_solver_;
-
-    std::string forearm_roll_link_name_;
-    std::string wrist_pitch_joint_name_;
-    std::string end_effector_link_name_;
+    virtual void GetSuccs(
+        int state_id,
+        std::vector<int>& succs,
+        std::vector<int>& costs) = 0;
 };
 
-} // namespace motion
-} // namespace sbpl
+struct IPredFun {
+    virtual ~IPredFun() { }
 
-#endif
+    virtual void GetPreds(
+        int state_id,
+        std::vector<int>& preds,
+        std::vector<int>& costs) = 0;
+};
+
+struct ILazySuccFun {
+    virtual ~ILazySuccFun() { }
+
+    virtual void GetLazySuccs(
+        int state_id,
+        std::vector<int>& succs,
+        std::vector<int>& costs,
+        std::vector<bool>& true_costs) = 0;
+
+    virtual int GetSuccTrueCost(int state_id, int succ_id) = 0;
+};
+
+struct ILazyPredFun {
+    virtual ~ILazyPredFun() { }
+
+    virtual void GetLazyPreds(
+        std::vector<int>& preds,
+        std::vector<int>& costs,
+        std::vector<bool>& true_costs) = 0;
+
+    virtual int GetPredTrueCost(int state_id, int pred_id) = 0;
+};
+
+} // namespace sbpl

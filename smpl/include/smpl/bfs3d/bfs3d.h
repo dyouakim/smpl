@@ -39,6 +39,7 @@
 #include <tuple>
 #include <iostream>
 
+#include <smpl/console/console.h>
 namespace sbpl {
 namespace motion {
 
@@ -175,6 +176,7 @@ void BFS_3D::run(InputIt cells_begin, InputIt cells_end)
     for (auto it = cells_begin; it != cells_end; ++it) {
         if (ind == 3) {
             const int origin = getNode(xyz[0], xyz[1], xyz[2]);
+            SMPL_ERROR_STREAM("The computed origin is "<<origin);
             m_queue[start_count++] = origin;
             m_distance_grid[origin] = 0;
             ind = 0;
@@ -186,7 +188,8 @@ void BFS_3D::run(InputIt cells_begin, InputIt cells_end)
 
     m_queue_tail = start_count;
 
-    // fire off background thread to compute bfs
+   // fire off background thread to compute bfs
+
     m_search_thread = std::thread(
             static_cast<void (BFS_3D::*)(int, int, int volatile*, int*, int&, int&)>(&BFS_3D::search),
             this,
@@ -194,8 +197,9 @@ void BFS_3D::run(InputIt cells_begin, InputIt cells_end)
             m_dim_xy,
             m_distance_grid,
             m_queue,
-            m_queue_head,
-            m_queue_tail);
+            std::ref(m_queue_head),
+            std::ref(m_queue_tail));
+
     m_running = true;
 }
 

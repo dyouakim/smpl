@@ -119,8 +119,8 @@ private:
     {
         int state_id;       // corresponding graph state
         unsigned int g;     // cost-to-come
-        unsigned int h;     // estimated cost-to-go
-        unsigned int f;     // (g + eps * h) at time of insertion into OPEN
+        unsigned int h[2];     // estimated cost-to-go
+        unsigned int f[2];     // (g + eps * h) at time of insertion into OPEN
         unsigned int eg;    // g-value at time of expansion
         unsigned short iteration_closed[2];
         unsigned short call_number;
@@ -129,10 +129,17 @@ private:
         bool merged;
     };
 
-    struct SearchStateCompare
+    struct SearchStateCompareBase
     {
         bool operator()(const SearchState& s1, const SearchState& s2) const {
-            return s1.f < s2.f;
+            return s1.f[0] < s2.f[0];
+        }
+    };
+
+    struct SearchStateCompareArm
+    {
+        bool operator()(const SearchState& s1, const SearchState& s2) const {
+            return s1.f[1] < s2.f[1];
         }
     };
 
@@ -169,10 +176,10 @@ private:
 
     // search state (not including the values of g, f, back pointers, and
     // closed list from m_stats)
-    multi_index_intrusive_heap<SearchState, SearchStateCompare> m_open;
+    //multi_index_intrusive_heap<SearchState, SearchStateCompare> m_open;
     
-    /*intrusive_heap<SearchState, SearchStateCompare> m_open_base;
-    intrusive_heap<SearchState, SearchStateCompare> m_open_arm;*/
+    multi_index_intrusive_heap<SearchState, SearchStateCompareBase> m_open_base;
+    multi_index_intrusive_heap<SearchState, SearchStateCompareArm> m_open_arm;
 
     std::vector<SearchState*> m_incons;
     double m_curr_eps;
@@ -218,7 +225,7 @@ private:
 
     void recomputeHeuristics();
     void reorderOpen();
-    int computeKey(SearchState* s) const;
+    int computeKey(SearchState* s, sbpl::motion::GroupType planning_group);
 
     SearchState* getSearchState(int state_id);
     SearchState* createState(int state_id);

@@ -174,6 +174,12 @@ public:
     virtual ~PointProjectionExtension() { }
 
     virtual bool projectToPoint(int state_id, Eigen::Vector3d& pos) = 0;
+
+    virtual bool projectToBasePoint(int state_id, Eigen::Vector3d& pos)
+    {
+        return projectToPoint(state_id, pos);
+    }
+
 };
 
 class PoseProjectionExtension : public PointProjectionExtension
@@ -182,7 +188,7 @@ public:
 
     virtual ~PoseProjectionExtension() { }
 
-    bool projectToPoint(int state_id, Eigen::Vector3d& pos) override
+    bool projectToPoint(int state_id, Eigen::Vector3d& pos)
     {
         Eigen::Affine3d pose;
         if (!projectToPose(state_id, pose)) {

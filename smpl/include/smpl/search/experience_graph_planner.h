@@ -77,8 +77,8 @@ public:
     int set_goal(int goal_state_id) override;
     int set_start(int start_state_id) override;
     int force_planning_from_scratch() override;
-    int set_search_mode(bool first_solution_unbounded);
-    void costs_changed(const StateChangeQuery& state_change);
+    int set_search_mode(bool first_solution_unbounded) override;
+    void costs_changed(const StateChangeQuery& state_change) override;
     ///@}
 
 private:

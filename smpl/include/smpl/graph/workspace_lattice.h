@@ -121,7 +121,7 @@ public:
 
     /// \name Required Functions from PoseProjectionExtension
     ///@{
-    bool projectToPose(int state_id, Eigen::Affine3d& pose);
+    bool projectToPose(int state_id, Eigen::Affine3d& pose) override;
     ///@}
 
     /// \name Reimplemented Public Functions from RobotPlanningSpace

@@ -138,9 +138,9 @@ public:
         const std::vector<double>& angles,
         bool verbose = false) override;
 
-    virtual bool computePlanningLinkFK(
+    bool computePlanningLinkFK(
         const std::vector<double>& angles,
-        std::vector<double>& pose);
+        std::vector<double>& pose) override;
     ///@}
 
     /// \name Required Public Functions from Extension

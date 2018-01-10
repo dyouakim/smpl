@@ -53,31 +53,31 @@ public:
 
     /// \name Required Public Functions from ExperienceGraphExtension
     ///@{
-    bool loadExperienceGraph(const std::string& path);
+    bool loadExperienceGraph(const std::string& path) override;
 
     void getExperienceGraphNodes(
         int state_id,
-        std::vector<ExperienceGraph::node_id>& nodes);
+        std::vector<ExperienceGraph::node_id>& nodes) override;
 
     bool shortcut(
         int first_id,
         int second_id,
-        int& cost);
+        int& cost) override;
 
     bool snap(
         int first_id,
         int second_id,
-        int& cost);
+        int& cost) override;
 
-    const ExperienceGraph* getExperienceGraph() const;
-    ExperienceGraph* getExperienceGraph();
+    const ExperienceGraph* getExperienceGraph() const override;
+    ExperienceGraph* getExperienceGraph() override;
 
-    int getStateID(ExperienceGraph::node_id n) const;
+    int getStateID(ExperienceGraph::node_id n) const override;
     ///@}
 
     /// \name Reimplemented Public Functions from Extension
     ///@{
-    Extension* getExtension(size_t class_code);
+    Extension* getExtension(size_t class_code) override;
     ///@}
 
 private:

@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 2.8)
 project(sbpl_kdl_robot_model)
 
 set(CMAKE_BUILD_TYPE Release)
-list(APPEND CMAKE_CXX_FLAGS "-std=c++11")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
 
 find_package(catkin
     REQUIRED
@@ -21,7 +21,6 @@ catkin_package(
     LIBRARIES
         sbpl_kdl_robot_model
     CATKIN_DEPENDS
-        leatherman
         roscpp
         smpl
         urdf

@@ -73,7 +73,7 @@ bool ManipLatticeActionSpace::init(ManipLattice* space)
     }
 
     useMultipleIkSolutions(false);
-    useLongAndShortPrims(false);
+    useLongAndShortPrims(true);
     useAmp(MotionPrimitive::SNAP_TO_XYZ, false);
     useAmp(MotionPrimitive::SNAP_TO_RPY, false);
     useAmp(MotionPrimitive::SNAP_TO_XYZ_RPY, false);
@@ -155,6 +155,7 @@ bool ManipLatticeActionSpace::load(const std::string& action_filename)
 
     ManipLattice* lattice = static_cast<ManipLattice*>(planningSpace());
     
+    
     for (int i = 0; i < nrows; ++i) {
         // read joint delta
         for (int j = 0; j < ncols-2; ++j) {
@@ -183,7 +184,6 @@ bool ManipLatticeActionSpace::load(const std::string& action_filename)
         {
             SMPL_ERROR("No weight defiend for this MP!");
         }
-
         if (i < (nrows - short_mprims)) {
             addMotionPrim(mprim, group, weight, false);
         } else {
@@ -222,6 +222,7 @@ void ManipLatticeActionSpace::addMotionPrim(
             }
         }
         m_mprims.push_back(m);
+
     }
 
 }
@@ -283,11 +284,7 @@ int ManipLatticeActionSpace::shortDistCount() const
 
 bool ManipLatticeActionSpace::useAmp(MotionPrimitive::Type type) const
 {
-    if (type >= 0 && type < MotionPrimitive::NUMBER_OF_MPRIM_TYPES) {
-        return m_mprim_enabled[type];
-    } else {
-        return false;
-    }
+    return m_mprim_enabled[type];
 }
 
 bool ManipLatticeActionSpace::useMultipleIkSolutions() const
@@ -302,18 +299,12 @@ bool ManipLatticeActionSpace::useLongAndShortPrims() const
 
 double ManipLatticeActionSpace::ampThresh(MotionPrimitive::Type type) const
 {
-    if (type >= 0 && type < MotionPrimitive::NUMBER_OF_MPRIM_TYPES) {
-        return m_mprim_thresh[type];
-    } else {
-        return std::numeric_limits<double>::quiet_NaN();
-    }
+    return m_mprim_thresh[type];
 }
 
 void ManipLatticeActionSpace::useAmp(MotionPrimitive::Type type, bool enable)
 {
-    if (type >= 0 && type < MotionPrimitive::NUMBER_OF_MPRIM_TYPES) {
-        m_mprim_enabled[type] = enable;
-    }
+    m_mprim_enabled[type] = enable;
 }
 
 void ManipLatticeActionSpace::useMultipleIkSolutions(bool enable)
@@ -330,9 +321,7 @@ void ManipLatticeActionSpace::ampThresh(
     MotionPrimitive::Type type,
     double thresh)
 {
-    if (type >= 0 && type < MotionPrimitive::NUMBER_OF_MPRIM_TYPES &&
-        type != MotionPrimitive::LONG_DISTANCE)
-    {
+    if (type != MotionPrimitive::LONG_DISTANCE) {
         m_mprim_thresh[type] = thresh;
     }
 }
@@ -408,19 +397,22 @@ bool ManipLatticeActionSpace::apply(
     }
 
     std::vector<Action> act;
+    
     if(group!=-1)
     {
         std::for_each( m_mprims.begin(), m_mprims.end(),
         [&](MotionPrimitive& mp ) mutable
            {
-             if( mp.group == sbpl::motion::GroupType(group) || mp.group == sbpl::motion::GroupType::ANY)
+            
+             if( mp.group == group || mp.group == sbpl::motion::GroupType::ANY)
              { 
-               act.clear();
+                act.clear();
                if (getAction(parent, goal_dist, start_dist, mp, act)) {
                 actions.insert(actions.end(), act.begin(), act.end());
                 weights.push_back(mp.weight);
                 }
              }
+             
             } );
     }
     else
@@ -433,7 +425,6 @@ bool ManipLatticeActionSpace::apply(
             }
         }
     }
-
     if (actions.empty()) {
         SMPL_WARN_ONCE("No motion primitives specified");
     }
@@ -461,7 +452,6 @@ bool ManipLatticeActionSpace::getAction(
     if (!mprimActive(start_dist, goal_dist, mp.type)) {
         return false;
     }
-    //SMPL_INFO_STREAM("GetAction: check MP type "<<mp.type<<" and "<<mp.group);
     GoalType goal_type = planningSpace()->goal().type;
     const std::vector<double>& goal_pose = planningSpace()->goal().pose;
 
@@ -534,7 +524,7 @@ bool ManipLatticeActionSpace::applyMotionPrimitive(
             action[i][j] = action[i][j] + state[j];
    
         }
-    }
+    } 
     return true;
 }
 

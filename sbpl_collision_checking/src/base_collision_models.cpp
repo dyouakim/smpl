@@ -558,7 +558,7 @@ size_t CollisionSphereModelTree::buildMetaRecursive(
         sphere.center = compact_bounding_sphere_center;
         sphere.radius = compact_bounding_sphere_radius;
     }
-    sphere.name;
+//    sphere.name; // TODO: worthwhile to name intermediate spheres?
     sphere.priority = 0;
     reinterpret_cast<size_t&>(sphere.left) = left_idx;
     reinterpret_cast<size_t&>(sphere.right) = right_idx;

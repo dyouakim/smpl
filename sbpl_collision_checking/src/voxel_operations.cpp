@@ -175,6 +175,8 @@ bool VoxelizeNonPlaneShape(
         }
         return VoxelizeOcTree(*octree, pose, res, go, voxels);
     }   break;
+    case shapes::UNKNOWN_SHAPE:
+        return false;
     }
 
     return false;

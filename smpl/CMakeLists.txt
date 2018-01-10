@@ -17,7 +17,9 @@ set(sbpl_INCLUDE_DIRS ${SBPL_INCLUDE_DIRS})
 set(sbpl_LIBRARIES ${SBPL_LIBRARIES})
 
 if(SMPL_ROS_BUILD)
-    find_package(catkin REQUIRED COMPONENTS roscpp visualization_msgs)
+    find_package(catkin REQUIRED COMPONENTS roscpp visualization_msgs 
+  tf
+  tf_conversions)
 
     catkin_package(
         INCLUDE_DIRS
@@ -38,7 +40,7 @@ if(SMPL_ROS_BUILD)
     set(SMPL_SV_VISUALIZATION_MSGS ON)
 endif()
 
-add_compile_options("-std=c++11")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
 
 if(SMPL_ROS_BUILD AND SMPL_CONSOLE_ROS)
     add_definitions(-DSMPL_CONSOLE_ROS)
@@ -49,7 +51,7 @@ else()
     add_definitions(-DSMPL_LOG_FILE_AND_LINE=1)
 endif()
 
-add_definitions(-DSBPL_VISUALIZE_MIN_SEVERITY=SBPL_VISUALIZE_SEVERITY_INFO)
+add_definitions(-DSV_PACKAGE_NAME="smpl")
 
 include_directories(SYSTEM ${Boost_INCLUDE_DIRS})
 include_directories(SYSTEM ${EIGEN3_INCLUDE_DIR})
@@ -115,7 +117,10 @@ add_library(
     src/search/unconstrained_mhastar.cpp
     src/search/arastar.cpp
     src/search/experience_graph_planner.cpp
-    src/search/adaptive_planner.cpp)
+    src/search/adaptive_planner.cpp
+    src/search/lazy_arastar.cpp
+    src/search/lazy_mhastar.cpp
+    src/search/awastar.cpp)
 target_link_libraries(smpl ${Boost_LIBRARIES} ${sbpl_LIBRARIES})
 if(SMPL_ROS_BUILD)
     target_link_libraries(smpl ${catkin_LIBRARIES})

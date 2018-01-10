@@ -96,11 +96,13 @@ public:
 
      /// \name Required Public Functions from ActionSpace
     ///@{
+
     bool apply(const RobotState& parent, std::vector<Action>& actions);
 
     /// \name Required Public Functions from ActionSpace
     ///@{
     bool apply(const RobotState& parent, std::vector<Action>& actions, ActionsWeight& weights, int group);
+
     ///@}
 
     /// \name Reimplemented Public Functions from RobotPlanningSpaceObserver

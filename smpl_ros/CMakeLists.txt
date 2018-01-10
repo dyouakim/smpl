@@ -3,7 +3,7 @@ project(smpl_ros)
 
 set(CMAKE_BUILD_TYPE Release)
 
-add_compile_options("-std=c++11")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
 
 find_package(Boost REQUIRED COMPONENTS filesystem)
 
@@ -41,6 +41,8 @@ catkin_package(
     DEPENDS
         Boost
         sbpl)
+
+add_definitions(-DSV_PACKAGE_NAME="smpl_ros")
 
 include_directories(SYSTEM ${Boost_INCLUDE_DIRS})
 include_directories(SYSTEM ${EIGEN3_INCLUDE_DIR})

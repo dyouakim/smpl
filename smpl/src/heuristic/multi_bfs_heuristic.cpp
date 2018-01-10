@@ -35,7 +35,6 @@ bool MultiBfsHeuristic::init(RobotPlanningSpace* space, const OccupancyGrid* gri
         SMPL_INFO_NAMED(LOG, "Got Point Projection Extension!");
     }
     syncGridAndBfs();
-
     return true;
 }
 
@@ -61,17 +60,58 @@ void MultiBfsHeuristic::updateGoal(const GoalConstraint& goal)
             goal.tgt_off_pose[0], goal.tgt_off_pose[1], goal.tgt_off_pose[2],
             gx, gy, gz);
 
-    SMPL_DEBUG_NAMED(LOG, "Setting the BFS heuristic goal (%d, %d, %d)", gx, gy, gz);
-
-    if (!m_bfs->inBounds(gx, gy, gz)) {
-        SMPL_ERROR_NAMED(LOG, "Heuristic goal is out of BFS bounds");
-    }
-
     m_goal_x = gx;
     m_goal_y = gy;
     m_goal_z = gz;
 
-    m_bfs->run(gx, gy, gz);
+    SMPL_DEBUG_NAMED(LOG, "Setting the BFS heuristic goal (%d, %d, %d)", gx, gy, gz);
+    SMPL_ERROR_STREAM("Origin_arm "<<gx<<","<<gy<<","<<gz);
+    
+    int listSize = std::floor((double)(0.3/grid()->resolution()))*2+1;
+    std::vector<int> inputGoals(pow(listSize,3)*3);
+    SMPL_ERROR_STREAM("Goal Region Size "<<listSize<<" resolution "<<grid()->resolution()<<" total size "<<inputGoals.size());
+    int idx = 0;
+    int xSign = 1,ySign = 1, zSign = 1;
+    for(int i=0;i<listSize;i++)
+    {
+        for(int j=0;j<listSize;j++)
+           for(int k=0;k<listSize;k++)
+            {   
+                if(i>listSize/2)
+                    xSign = -(i-(listSize/2));
+                else
+                    xSign = i;
+                if(j>listSize/2)
+                    ySign = -(j-(listSize/2));
+                else
+                    ySign=j;
+                if(zSign>listSize/2)
+                    zSign = -(k-(listSize/2));
+                else
+                    zSign=k;
+                inputGoals[idx]  = gx + xSign;
+                inputGoals[idx+1] = gy + ySign;
+                inputGoals[idx+2] = gz + zSign;
+                SMPL_ERROR_STREAM("indices: "<<i<<","<<j<<","<<k);
+                SMPL_ERROR_STREAM("Element at  ["<<
+                    idx<<","<<(idx+1)<<","<<(idx+2)<<"] is "<<
+                    inputGoals[idx]<<","<<inputGoals[idx+1]<<","<<inputGoals[idx+2]); 
+                idx+=3; 
+            }
+    }
+
+    m_bfs[GroupType::BASE]->run < std::vector<int>::iterator >(inputGoals.begin(),inputGoals.end());
+
+    if (!m_bfs[GroupType::ARM]->inBounds(gx, gy, gz)) {
+        SMPL_ERROR_NAMED(LOG, "Heuristic goal is out of BFS bounds");
+    }
+
+
+    m_bfs[GroupType::ARM]->run(gx, gy, gz);
+
+    if (!m_pp) {
+        return ;
+    }
 }
 
 double MultiBfsHeuristic::getMetricStartDistance(double x, double y, double z)
@@ -104,19 +144,19 @@ double MultiBfsHeuristic::getMetricGoalDistance(double x, double y, double z)
 {
     int gx, gy, gz;
     grid()->worldToGrid(x, y, z, gx, gy, gz);
-    if (!m_bfs->inBounds(gx, gy, gz)) {
+    if (!m_bfs[GroupType::ARM]->inBounds(gx, gy, gz)) {
         return (double)BFS_3D::WALL * grid()->resolution();
     } else {
-        return (double)m_bfs->getDistance(gx, gy, gz) * grid()->resolution();
+        return (double)m_bfs[GroupType::ARM]->getDistance(gx, gy, gz) * grid()->resolution();
     }
 }
 
 double MultiBfsHeuristic::getMetricGoalDistance(double x, double y, double z, GroupType planning_group)
 {
-    int gx, gy, gz;
+    /*int gx, gy, gz;
     if(planning_group==GroupType::BASE)
     {
-        grid()->worldToGrid(x+0.6, y+0.6, z+0.6, gx, gy, gz);
+        grid()->worldToGrid(x, y, z, gx, gy, gz);
         if (!m_base_bfs->inBounds(gx, gy, gz)) {
             return (double)BFS_3D::WALL * grid()->resolution();
         } else {
@@ -131,7 +171,7 @@ double MultiBfsHeuristic::getMetricGoalDistance(double x, double y, double z, Gr
         } else {
             return (double)m_bfs->getDistance(gx, gy, gz) * grid()->resolution();
         }
-    }
+    }*/
 }
 
 Extension* MultiBfsHeuristic::getExtension(size_t class_code)
@@ -156,27 +196,34 @@ int MultiBfsHeuristic::GetGoalHeuristic(int state_id)
     Eigen::Vector3i dp;
     grid()->worldToGrid(p.x(), p.y(), p.z(), dp.x(), dp.y(), dp.z());
 
-    return getBfsCostToGoal(*m_bfs, dp.x(), dp.y(), dp.z());
+    return getBfsCostToGoal(*m_bfs[GroupType::ARM], dp.x(), dp.y(), dp.z());
 }
 
 
-int MultiBfsHeuristic::GetGoalHeuristic(int state_id, GroupType planning_group)
+int MultiBfsHeuristic::GetGoalHeuristic(int state_id, int planning_group, int base_heuristic_idx)
 {
     if (!m_pp) {
         return 0;
     }
 
     Eigen::Vector3d p;
-    if (!m_pp->projectToPoint(state_id, p)) {
-        return 0;
+    if(planning_group==GroupType::BASE)
+    {
+        if (!m_pp->projectToBasePoint(state_id, p)) {
+            return 0;
+        }
+    }
+    else
+    {
+        if (!m_pp->projectToPoint(state_id, p)) {
+            return 0;
+        }
     }
 
     Eigen::Vector3i dp;
     grid()->worldToGrid(p.x(), p.y(), p.z(), dp.x(), dp.y(), dp.z());
-    if(planning_group==GroupType::BASE)
-        return getBfsCostToGoal(*m_base_bfs, dp.x(), dp.y(), dp.z(), planning_group);
-    else
-        return getBfsCostToGoal(*m_bfs, dp.x(), dp.y(), dp.z(), planning_group);
+    
+   return getBfsCostToGoal(*m_bfs[planning_group], dp.x(), dp.y(), dp.z());
 }
 
 int MultiBfsHeuristic::GetStartHeuristic(int state_id)
@@ -196,17 +243,6 @@ int MultiBfsHeuristic::GetFromToHeuristic(int from_id, int to_id)
     }
 }
 
-int MultiBfsHeuristic::GetFromToHeuristic(int from_id, int to_id, GroupType planning_group)
-{
-    if (to_id == planningSpace()->getGoalStateID()) {
-        return GetGoalHeuristic(from_id, planning_group);
-    }
-    else {
-        SMPL_WARN_ONCE("MultiBfsHeuristic::GetFromToHeuristic unimplemented for arbitrary state pair");
-        return 0;
-    }
-}
-
 auto MultiBfsHeuristic::getWallsVisualization() const -> visual::Marker
 {
     std::vector<Eigen::Vector3d> centers;
@@ -216,7 +252,7 @@ auto MultiBfsHeuristic::getWallsVisualization() const -> visual::Marker
     for (int x = 0; x < dimX; x++) {
     for (int y = 0; y < dimY; y++) {
     for (int z = 0; z < dimZ; z++) {
-        if (m_base_bfs->isWall(x, y, z)) {
+        if (m_bfs[GroupType::ARM]->isWall(x, y, z)) {
             Eigen::Vector3d p;
             grid()->gridToWorld(x, y, z, p.x(), p.y(), p.z());
             centers.push_back(p);
@@ -246,14 +282,14 @@ auto MultiBfsHeuristic::getValuesVisualization() -> visual::Marker
         return visual::MakeEmptyMarker();
     }
 
-    if (m_bfs->isWall(m_goal_x, m_goal_y, m_goal_z)) {
+    if (m_bfs[GroupType::ARM]->isWall(m_goal_x, m_goal_y, m_goal_z)) {
         return visual::MakeEmptyMarker();
     }
 
     // hopefully this doesn't screw anything up too badly...this will flush the
     // bfs to a little past the start, but this would be done by the search
     // hereafter anyway
-    int start_heur = GetGoalHeuristic(planningSpace()->getStartStateID(),GroupType::BASE);
+    int start_heur = GetGoalHeuristic(planningSpace()->getStartStateID());
     if (start_heur == Infinity) {
         return visual::MakeEmptyMarker();
     }
@@ -315,7 +351,7 @@ auto MultiBfsHeuristic::getValuesVisualization() -> visual::Marker
 
 //        visited(c.x, c.y, c.z) = true;
 
-        const int d = m_cost_per_cell * m_bfs->getDistance(c.x, c.y, c.z);
+        const int d = m_cost_per_cell * m_bfs[GroupType::ARM]->getDistance(c.x, c.y, c.z);
 
         for (int dx = -1; dx <= 1; ++dx) {
         for (int dy = -1; dy <= 1; ++dy) {
@@ -329,7 +365,7 @@ auto MultiBfsHeuristic::getValuesVisualization() -> visual::Marker
             int sz = c.z + dz;
 
             // check if neighbor is valid
-            if (!m_bfs->inBounds(sx, sy, sz) || m_bfs->isWall(sx, sy, sz)) {
+            if (!m_bfs[GroupType::ARM]->inBounds(sx, sy, sz) || m_bfs[GroupType::ARM]->isWall(sx, sy, sz)) {
                 continue;
             }
 
@@ -340,7 +376,7 @@ auto MultiBfsHeuristic::getValuesVisualization() -> visual::Marker
 
             visited(sx, sy, sz) = true;
 
-            int dd = m_cost_per_cell * m_bfs->getDistance(sx, sy, sz);
+            int dd = m_cost_per_cell * m_bfs[GroupType::ARM]->getDistance(sx, sy, sz);
             cells.push({sx, sy, sz, dd});
         }
         }
@@ -360,8 +396,12 @@ void MultiBfsHeuristic::syncGridAndBfs()
     const int xc = grid()->numCellsX();
     const int yc = grid()->numCellsY();
     const int zc = grid()->numCellsZ();
-    m_bfs.reset(new BFS_3D(xc, yc, zc));
-    m_base_bfs.reset(new BFS_3D(xc, yc, zc));
+    std::unique_ptr<BFS_3D> temp_base, temp_arm;
+    temp_base.reset(new BFS_3D(xc, yc, zc));
+    m_bfs.push_back(std::move(temp_base));
+    temp_arm.reset(new BFS_3D(xc, yc, zc));
+    m_bfs.push_back(std::move(temp_arm));
+
     const int cell_count = xc * yc * zc;
     int wall_count = 0, base_wall_count = 0;
     for (int x = 0; x < xc; ++x) {
@@ -369,12 +409,12 @@ void MultiBfsHeuristic::syncGridAndBfs()
             for (int z = 0; z < zc; ++z) {
                 const double radius = m_inflation_radius;
                 if (grid()->getDistance(x, y, z) <= radius) {
-                    m_bfs->setWall(x, y, z);
+                    m_bfs[GroupType::ARM]->setWall(x, y, z);
                     ++wall_count;
                 }
                 if(grid()->getDistance(x, y, z) <= m_base_inflation_radius)
                 {
-                    m_base_bfs->setWall(x,y,z);
+                    m_bfs[GroupType::BASE]->setWall(x,y,z);
                     ++base_wall_count;
                 }
             }
@@ -393,36 +433,9 @@ int MultiBfsHeuristic::getBfsCostToGoal(const BFS_3D& bfs, int x, int y, int z) 
     else if (bfs.getDistance(x, y, z) == BFS_3D::WALL) {
         return Infinity;
     }
-    else {
+    else 
+    {
         return m_cost_per_cell * bfs.getDistance(x, y, z);
-    }
-}
-
-int MultiBfsHeuristic::getBfsCostToGoal(const BFS_3D& bfs, int x, int y, int z, GroupType planning_group) const
-{
-    if(planning_group==GroupType::BASE)
-    {
-        if (!bfs.inBounds(x+0.6, y+0.6, z+0.6)) {
-            return Infinity;
-        }
-        else if (bfs.getDistance(x+0.6, y+0.6, z+0.6) == BFS_3D::WALL) {
-            return Infinity;
-        }
-        else {
-            return m_cost_per_cell * bfs.getDistance(x+0.6, y+0.6, z+0.6);
-        }
-    }
-    else
-    {
-        if (!bfs.inBounds(x, y, z)) {
-            return Infinity;
-        }
-        else if (bfs.getDistance(x, y, z) == BFS_3D::WALL) {
-            return Infinity;
-        }
-        else {
-            return m_cost_per_cell * bfs.getDistance(x, y, z);
-        }
     }
 }
 

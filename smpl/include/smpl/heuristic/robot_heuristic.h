@@ -85,6 +85,11 @@ public:
     /// \name Restate Required Public Functions from Heuristic
     ///@{
     virtual int GetGoalHeuristic(int state_id) = 0;
+
+    virtual int GetGoalHeuristic(int state_id, int planning_group, int base_heuristic_idx)
+    {
+        return GetGoalHeuristic(state_id);
+    }
     virtual int GetStartHeuristic(int state_id) = 0;
     virtual int GetFromToHeuristic(int from_id, int to_id) = 0;
     ///@}

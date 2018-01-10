@@ -147,7 +147,7 @@ public:
     bool setTunnel(const std::vector<int>& states) override;
     bool isExecutable(const std::vector<int>& states) const override;
     bool setTrackMode(const std::vector<int>& tunnel) override;
-    bool setPlanMode();
+    bool setPlanMode() override;
     ///@}
 
     /// \name Required Public Functions from RobotPlanningSpcae

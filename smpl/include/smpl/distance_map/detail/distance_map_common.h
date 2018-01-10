@@ -64,7 +64,7 @@ void CreateNeighborUpdateList(
 
 struct Eigen_Vector3i_compare
 {
-    bool operator()(const Eigen::Vector3i& u, const Eigen::Vector3i& v)
+    bool operator()(const Eigen::Vector3i& u, const Eigen::Vector3i& v) const
     {
         return std::tie(u.x(), u.y(), u.z()) < std::tie(v.x(), v.y(), v.z());
     }

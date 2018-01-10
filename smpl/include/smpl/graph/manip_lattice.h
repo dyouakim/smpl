@@ -135,14 +135,15 @@ public:
 
     /// \name Required Public Functions from ExtractRobotStateExtension
     ///@{
-    const RobotState& extractState(int state_id);
+    const RobotState& extractState(int state_id) override;
     ///@}
 
     /// \name Required Public Functions from PoseProjectionExtension
     ///@{
-    bool projectToPose(int state_id, Eigen::Affine3d& pos);
+    bool projectToPose(int state_id, Eigen::Affine3d& pos) override;
     ///@}
 
+    bool projectToBasePoint(int state_id, Eigen::Vector3d& pos);
     /// \name Required Public Functions from RobotPlanningSpace
     ///@{
     bool setStart(const RobotState& state) override;
@@ -157,7 +158,7 @@ public:
 
     /// \name Required Public Functions from Extension
     ///@{
-    virtual Extension* getExtension(size_t class_code);
+    virtual Extension* getExtension(size_t class_code) override;
     ///@}
 
     /// \name Required Public Functions from DiscreteSpaceInformation
@@ -199,6 +200,11 @@ protected:
         const RobotState& state,
         std::vector<double>& pose) const;
 
+    bool computeBaseFrameIK(
+        const std::vector<double>& pose,
+        RobotState& state) const;
+
+
     int cost(
         ManipLatticeState* HashEntry1,
         ManipLatticeState* HashEntry2,
@@ -217,9 +223,13 @@ protected:
     auto getStateVisualization(const RobotState& vars, const std::string& ns)
         -> std::vector<visual::Marker>;
 
+    auto getStateVisualizationByGroup(const RobotState& vars, const std::string& ns, int group)
+        -> std::vector<visual::Marker>;
+
 private:
 
     ForwardKinematicsInterface* m_fk_iface = nullptr;
+    InverseKinematicsInterface* m_ik_iface = nullptr;
     ActionSpace* m_actions = nullptr;
 
     // cached from robot model

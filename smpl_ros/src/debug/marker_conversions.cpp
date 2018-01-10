@@ -162,7 +162,6 @@ void ConvertMarkerToMarkerMsg(
         mm.scale.x = boost::get<MeshResource>(m.shape).scale.x();
         mm.scale.y = boost::get<MeshResource>(m.shape).scale.y();
         mm.scale.z = boost::get<MeshResource>(m.shape).scale.z();
-//        mm.scale.x = mm.scale.y = mm.scale.z = 1.0;
         break;
     case SHAPE_TRIANGLE_LIST:
         mm.type = visualization_msgs::Marker::TRIANGLE_LIST;

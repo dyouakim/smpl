@@ -124,7 +124,7 @@ bool UBR1KDLRobotModel::computeIK(
         return rpy_solver_->computeRPYOnly(rpy2, start, fpose, epose, 1, solution);
     }
     else {
-        if (computeIKSearch(pose, start, solution, 0.01) < 0) {
+        if (!computeIKSearch(pose, start, solution, 0.01)) {
             return false;
         }
 

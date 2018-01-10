@@ -12,7 +12,7 @@ public:
         sbpl::visual::Level level,
         const visualization_msgs::MarkerArray& markers)
     {
-        for (const visualization_msgs::Marker& marker : markers.markers) {
+        for (auto& marker : markers.markers) {
             switch (level) {
             case sbpl::visual::Level::Debug:
                 printf("[DEBUG] ");
@@ -28,6 +28,9 @@ public:
                 break;
             case sbpl::visual::Level::Fatal:
                 printf("[FATAL] ");
+                break;
+            default:
+                assert(0);
                 break;
             }
             printf("[%s] ", marker.ns.c_str());
@@ -67,6 +70,9 @@ public:
                 break;
             case visualization_msgs::Marker::TRIANGLE_LIST:
                 printTriangleList(marker);
+                break;
+            default:
+                assert(0);
                 break;
             }
             printf("\n");

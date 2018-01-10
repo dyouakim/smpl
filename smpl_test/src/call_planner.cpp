@@ -1660,7 +1660,7 @@ int main(int argc, char* argv[])
     // set planning scene
     if (!cc.setPlanningScene(scene)) {
         ROS_ERROR("Failed to update Collision Checker from Planning Scene");
-        return false;
+        return 1;
     }
 
     SV_SHOW_INFO(grid.getDistanceFieldVisualization(0.2));
@@ -1756,11 +1756,11 @@ int main(int argc, char* argv[])
     req.max_acceleration_scaling_factor = 1.0;
     req.max_velocity_scaling_factor = 1.0;
     req.num_planning_attempts = 1;
-    req.path_constraints;
+//    req.path_constraints;
     req.planner_id = "arastar.bfs.manip";
     req.start_state = scene.robot_state;
-    req.trajectory_constraints;
-    req.workspace_parameters;
+//    req.trajectory_constraints;
+//    req.workspace_parameters;
 
     // plan
     ROS_INFO("Calling solve...");

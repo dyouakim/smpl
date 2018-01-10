@@ -95,6 +95,12 @@ bool ManipLattice::init(
 
     m_fk_iface = _robot->getExtension<ForwardKinematicsInterface>();
 
+    m_ik_iface = _robot->getExtension<InverseKinematicsInterface>();
+    if (!m_ik_iface) {
+        SMPL_WARN("Manip Lattice requires Inverse Kinematics Interface extension");
+        return false;
+    }
+
     m_min_limits.resize(_robot->jointVariableCount());
     m_max_limits.resize(_robot->jointVariableCount());
     m_continuous.resize(_robot->jointVariableCount());
@@ -165,6 +171,9 @@ void ManipLattice::PrintState(int stateID, bool verbose, FILE* fout)
         case GoalType::JOINT_STATE_GOAL:
             ss << "state: " << goal().angles;
             break;
+        default:
+            assert(0);
+            break;
         }
         ss << " }>";
     } else {
@@ -213,7 +222,10 @@ void ManipLattice::GetSuccs(
     SMPL_DEBUG_STREAM_NAMED(params()->expands_log, "  angles: " << parent_entry->state);
     SMPL_DEBUG_NAMED(params()->expands_log, "  heur: %d", GetGoalHeuristic(state_id));
 
+
     //SV_SHOW_INFO(getStateVisualization(parent_entry->state, "expansion"));
+    auto* vis_name = "expansion";
+    SV_SHOW_INFO_NAMED(vis_name, getStateVisualization(parent_entry->state, vis_name));
 
     int goal_succ_count = 0;
 
@@ -306,7 +318,8 @@ void ManipLattice::GetSuccsByGroup(
     SMPL_DEBUG_STREAM_NAMED(params()->expands_log, "  angles: " << parent_entry->state);
     SMPL_DEBUG_NAMED(params()->expands_log, "  heur: %d", GetGoalHeuristic(state_id));
 
-    //SV_SHOW_INFO(getStateVisualization(parent_entry->state, "expansion"));
+    auto* vis_name = "expansion";
+    SV_SHOW_INFO_NAMED(vis_name, getStateVisualizationByGroup(parent_entry->state, vis_name, group));
 
     int goal_succ_count = 0;
 
@@ -367,6 +380,7 @@ void ManipLattice::GetSuccsByGroup(
     if (goal_succ_count > 0) {
         SMPL_DEBUG_NAMED(params()->expands_log, "Got %d goal successors!", goal_succ_count);
     }
+    //getchar();
 }
 
 Stopwatch GetLazySuccsStopwatch("GetLazySuccs", 10);
@@ -400,7 +414,8 @@ void ManipLattice::GetLazySuccs(
     SMPL_DEBUG_NAMED(params()->expands_log, "  heur: %d", GetGoalHeuristic(state_id));
 
     const RobotState& source_angles = state_entry->state;
-    SV_SHOW_DEBUG(getStateVisualization(source_angles, "expansion"));
+    auto* vis_name = "expansion";
+    SV_SHOW_DEBUG_NAMED(vis_name, getStateVisualization(source_angles, vis_name));
 
     std::vector<Action> actions;
     if (!m_actions->apply(source_angles, actions)) {
@@ -468,7 +483,8 @@ int ManipLattice::GetTrueCost(int parentID, int childID)
     assert(child_entry && child_entry->coord.size() >= robot()->jointVariableCount());
 
     const RobotState& parent_angles = parent_entry->state;
-    SV_SHOW_DEBUG(getStateVisualization(parent_angles, "expansion"));
+    auto* vis_name = "expansion";
+    SV_SHOW_DEBUG_NAMED(vis_name, getStateVisualization(parent_angles, vis_name));
 
     std::vector<Action> actions;
     if (!m_actions->apply(parent_angles, actions)) {
@@ -561,6 +577,25 @@ bool ManipLattice::projectToPose(int state_id, Eigen::Affine3d& pose)
     pose =
             Eigen::Translation3d(vpose[0], vpose[1], vpose[2]) *
             Eigen::Affine3d(R);
+    return true;
+}
+
+bool ManipLattice::projectToBasePoint(int state_id, Eigen::Vector3d& pos)
+{   
+    if(state_id == m_goal_state_id)
+    {   
+        std::vector<double> goalConfig(robot()->jointVariableCount());
+        computeBaseFrameIK(goal().tgt_off_pose,goalConfig);
+        pos[0] = goalConfig[0];
+        pos[1] = goalConfig[1];
+        pos[2] = goalConfig[2];
+    }
+    else
+    {
+        pos[0] = m_states[state_id]->state[0];
+        pos[1] = m_states[state_id]->state[1];
+        pos[2] = m_states[state_id]->state[2];
+    }  
     return true;
 }
 
@@ -702,6 +737,18 @@ bool ManipLattice::computePlanningFrameFK(
 
     assert(pose.size() == 6);
     return true;
+}
+
+bool ManipLattice::computeBaseFrameIK(
+        const std::vector<double>& pose,
+        RobotState& state) const
+{
+    assert(m_ik_iface);
+
+    RobotState seed(robot()->jointVariableCount(), 0);
+    if (!m_ik_iface->computeIK(pose, seed, state)) {
+        SMPL_WARN("No valid IK solution for the goal pose.");
+    }
 }
 
 int ManipLattice::cost(
@@ -977,6 +1024,34 @@ auto ManipLattice::getStateVisualization(
     return markers;
 }
 
+auto ManipLattice::getStateVisualizationByGroup(const RobotState& state, const std::string& ns, int group)
+        -> std::vector<visual::Marker>
+{
+    auto markers = collisionChecker()->getCollisionModelVisualization(state);
+    for (auto& marker : markers) {
+       
+        visual::Color color;
+        color.a=1;
+        color.g=0;
+        if(group == 1)
+        {
+            color.b=1;
+            color.r=0;
+             marker.ns = ns;
+        }
+        else
+        {
+           color.b=0;
+           color.r=1; 
+            marker.ns = "base_expansion";
+        }
+
+        marker.color = color;
+        
+    }
+    return markers;
+}
+
 bool ManipLattice::setStart(const RobotState& state)
 {
     SMPL_DEBUG_NAMED(params()->graph_log, "set the start state");
@@ -996,12 +1071,14 @@ bool ManipLattice::setStart(const RobotState& state)
 
     // check if the start configuration is in collision
     if (!collisionChecker()->isStateValid(state, true)) {
-        SV_SHOW_WARN(collisionChecker()->getCollisionModelVisualization(state));
+        auto* vis_name = "invalid_start";
+        SV_SHOW_WARN_NAMED(vis_name, collisionChecker()->getCollisionModelVisualization(state));
         SMPL_WARN(" -> in collision");
         return false;
     }
 
-    SV_SHOW_INFO(getStateVisualization(state, "start_config"));
+    auto* vis_name = "start_config";
+    SV_SHOW_INFO_NAMED(vis_name, getStateVisualization(state, vis_name));
 
     // get arm position in environment
     RobotCoord start_coord(robot()->jointVariableCount());
@@ -1076,7 +1153,8 @@ bool ManipLattice::extractPath(
             opath.push_back(entry->state);
         }
 
-        SV_SHOW_INFO(getStateVisualization(opath.back(), "goal_state"));
+        auto* vis_name = "goal_config";
+        SV_SHOW_INFO_NAMED(vis_name, getStateVisualization(opath.back(), vis_name));
         return true;
     }
 
@@ -1167,7 +1245,8 @@ bool ManipLattice::extractPath(
 
     // we made it!
     path = std::move(opath);
-    SV_SHOW_INFO(getStateVisualization(path.back(), "goal_state"));
+    auto* vis_name = "goal_config";
+    SV_SHOW_INFO_NAMED(vis_name, getStateVisualization(path.back(), vis_name));
     return true;
 }
 
@@ -1238,7 +1317,8 @@ bool ManipLattice::setGoalPose(const GoalConstraint& gc)
             Eigen::AngleAxisd(gc.tgt_off_pose[5], Eigen::Vector3d::UnitZ()) *
             Eigen::AngleAxisd(gc.tgt_off_pose[4], Eigen::Vector3d::UnitY()) *
             Eigen::AngleAxisd(gc.tgt_off_pose[3], Eigen::Vector3d::UnitX()));
-    SV_SHOW_INFO(visual::MakePoseMarkers(goal_pose, m_viz_frame_id, "target_goal"));
+    auto* vis_name = "goal_pose";
+    SV_SHOW_INFO_NAMED(vis_name, visual::MakePoseMarkers(goal_pose, m_viz_frame_id, vis_name));
 
     using namespace std::chrono;
     auto now = clock::now();
@@ -1251,7 +1331,6 @@ bool ManipLattice::setGoalPose(const GoalConstraint& gc)
     SMPL_DEBUG_NAMED(params()->graph_log, "    tol (radians): %0.3f", gc.rpy_tolerance[0]);
 
     startNewSearch();
-
     // set the (modified) goal
     return RobotPlanningSpace::setGoal(gc);
 }

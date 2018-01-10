@@ -42,6 +42,9 @@
 #include <smpl/debug/marker_utils.h>
 #include <smpl/heuristic/robot_heuristic.h>
 
+constexpr auto PlanAdaptiveGridVisName = "adaptive_grid_plan";
+constexpr auto TrackAdaptiveGridVisName = "adaptive_grid_track";
+
 auto std::hash<sbpl::motion::AdaptiveGridState>::operator()(
     const argument_type& s) const -> result_type
 {
@@ -288,14 +291,14 @@ bool AdaptiveWorkspaceLattice::setTrackMode(const std::vector<int>& tunnel)
         return false;
     }
     m_plan_mode = false;
-    SV_SHOW_INFO(getAdaptiveGridVisualization(m_plan_mode));
+    SV_SHOW_INFO_NAMED(TrackAdaptiveGridVisName, getAdaptiveGridVisualization(m_plan_mode));
     return true;
 }
 
 bool AdaptiveWorkspaceLattice::setPlanMode()
 {
     m_plan_mode = true;
-    SV_SHOW_INFO(getAdaptiveGridVisualization(m_plan_mode));
+    SV_SHOW_INFO_NAMED(PlanAdaptiveGridVisName, getAdaptiveGridVisualization(m_plan_mode));
     return true;
 }
 
@@ -420,12 +423,14 @@ bool AdaptiveWorkspaceLattice::setStart(const RobotState& state)
     }
 
     if (!collisionChecker()->isStateValid(state, true)) {
-        SV_SHOW_WARN(collisionChecker()->getCollisionModelVisualization(state));
+        auto* vis_name = "invalid_start";
+        SV_SHOW_WARN_NAMED(vis_name, collisionChecker()->getCollisionModelVisualization(state));
         SMPL_WARN("start state is in collision");
         return false;
     }
 
-    SV_SHOW_INFO(getStateVisualization(state, "start_config"));
+    auto vis_name = "start_config";
+    SV_SHOW_INFO_NAMED(vis_name, getStateVisualization(state, vis_name));
     WorkspaceCoord start_coord;
     stateRobotToCoord(state, start_coord);
 
@@ -615,8 +620,9 @@ bool AdaptiveWorkspaceLattice::setGoalPose(const GoalConstraint& goal)
             Eigen::AngleAxisd(goal.tgt_off_pose[5], Eigen::Vector3d::UnitZ()) *
             Eigen::AngleAxisd(goal.tgt_off_pose[4], Eigen::Vector3d::UnitY()) *
             Eigen::AngleAxisd(goal.tgt_off_pose[3], Eigen::Vector3d::UnitX()));
-    auto markers = visual::MakePoseMarkers(goal_pose, m_grid->getReferenceFrame(), "target_goal");
-    SV_SHOW_INFO(markers);
+    auto* vis_name = "goal_pose";
+    SV_SHOW_INFO_NAMED(vis_name, visual::MakePoseMarkers(
+            goal_pose, m_grid->getReferenceFrame(), vis_name));
 
     SMPL_DEBUG_NAMED(params()->graph_log, "set the goal state");
 
@@ -646,15 +652,16 @@ void AdaptiveWorkspaceLattice::GetSuccs(
 {
     SMPL_DEBUG_NAMED(params()->expands_log, "  coord: (%d, %d, %d), state: (%0.3f, %0.3f, %0.3f)", state.gx, state.gy, state.gz, state.x, state.y, state.z);
 
+    auto* vis_name = "expansion_lo";
     auto m = visual::MakeSphereMarker(
             state.x, state.y, state.z,
             m_grid->resolution(),
             30,
             m_grid->getReferenceFrame(),
-            "expansion_lo",
+            vis_name,
             0);
 
-    SV_SHOW_INFO(m);
+    SV_SHOW_INFO_NAMED(vis_name, m);
 
     SMPL_DEBUG_NAMED(params()->successors_log, "  actions: %zu", m_lo_prims.size());
     for (size_t aidx = 0; aidx < m_lo_prims.size(); ++aidx) {
@@ -761,7 +768,8 @@ void AdaptiveWorkspaceLattice::GetSuccs(
 {
     SMPL_DEBUG_STREAM_NAMED(params()->expands_log, "  coord: " << state.coord);
     SMPL_DEBUG_STREAM_NAMED(params()->expands_log, "  state: " << state.state);
-    SV_SHOW_DEBUG(getStateVisualization(state.state, "expansion"));
+    auto* vis_name = "expansion";
+    SV_SHOW_DEBUG_NAMED(vis_name, getStateVisualization(state.state, vis_name));
 
     std::vector<Action> actions;
     getActions(state, actions);
@@ -1124,7 +1132,7 @@ auto AdaptiveWorkspaceLattice::getAdaptiveGridVisualization(bool plan_mode) cons
         0.5 * m_grid->resolution(),
         color,
         m_grid->getReferenceFrame(),
-        plan_mode ? "adaptive_grid_plan" : "adaptive_grid_track");
+        plan_mode ? PlanAdaptiveGridVisName : TrackAdaptiveGridVisName);
 }
 
 } // namespace motion
