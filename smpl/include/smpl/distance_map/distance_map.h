@@ -85,6 +85,7 @@ public:
     int numCellsX() const override;
     int numCellsY() const override;
     int numCellsZ() const override;
+    int getCrossCellCount(double x, double y, double z) const;
 
     double getUninitializedDistance() const override;
 
@@ -114,6 +115,7 @@ private:
 
         int dist;
         int dist_new;
+        int counter;
 #if SMPL_DMAP_RETURN_CHANGED_CELLS
         int dist_old;
 #endif
