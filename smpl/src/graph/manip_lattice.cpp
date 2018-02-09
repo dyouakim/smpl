@@ -97,7 +97,7 @@ bool ManipLattice::init(
 
     m_ik_iface = _robot->getExtension<InverseKinematicsInterface>();
     if (!m_ik_iface) {
-        SMPL_WARN("Manip Lattice requires Inverse Kinematics Interface extension");
+        SMPL_DEBUG("Manip Lattice requires Inverse Kinematics Interface extension");
         return false;
     }
 
@@ -190,7 +190,7 @@ void ManipLattice::PrintState(int stateID, bool verbose, FILE* fout)
     if (fout == stdout) {
         SMPL_DEBUG_NAMED(params()->graph_log, "%s", ss.str().c_str());
     } else if (fout == stderr) {
-        SMPL_WARN("%s", ss.str().c_str());
+        SMPL_DEBUG("%s", ss.str().c_str());
     } else {
         fprintf(fout, "%s\n", ss.str().c_str());
     }
@@ -223,7 +223,7 @@ void ManipLattice::GetSuccs(
     SMPL_DEBUG_NAMED(params()->expands_log, "  heur: %d", GetGoalHeuristic(state_id));
 
 
-    //SV_SHOW_INFO(getStateVisualization(parent_entry->state, "expansion"));
+    //SSV_SHOW_DEBUG(getStateVisualization(parent_entry->state, "expansion"));
     auto* vis_name = "expansion";
     SV_SHOW_INFO_NAMED(vis_name, getStateVisualization(parent_entry->state, vis_name));
 
@@ -232,7 +232,7 @@ void ManipLattice::GetSuccs(
     std::vector<Action> actions;
     ActionsWeight weights;
     if (!m_actions->apply(parent_entry->state, actions,weights,-1)) {
-        SMPL_WARN("Failed to get actions");
+        SMPL_DEBUG("Failed to get actions");
         return;
     }
 
@@ -263,7 +263,7 @@ void ManipLattice::GetSuccs(
         const bool is_goal_succ = isGoal(action.back());
         if (is_goal_succ) {
             // update goal state
-            SMPL_WARN("increasing goal succ!");
+            SMPL_DEBUG("increasing goal succ!");
             ++goal_succ_count;
         }
 
@@ -316,6 +316,7 @@ void ManipLattice::GetSuccsByGroup(
     // log expanded state details
     SMPL_DEBUG_STREAM_NAMED(params()->expands_log, "  coord: " << parent_entry->coord);
     SMPL_DEBUG_STREAM_NAMED(params()->expands_log, "  angles: " << parent_entry->state);
+    SMPL_DEBUG_STREAM_NAMED(params()->expands_log, "  Source: " << parent_entry->source);
     SMPL_DEBUG_NAMED(params()->expands_log, "  heur: %d", GetGoalHeuristic(state_id));
 
     auto* vis_name = "expansion";
@@ -326,7 +327,7 @@ void ManipLattice::GetSuccsByGroup(
     std::vector<Action> actions;
     ActionsWeight weights;
     if (!m_actions->apply(parent_entry->state, actions, weights, group)) {
-        SMPL_WARN("Failed to get actions");
+        SMPL_DEBUG("Failed to get actions");
         return;
     }
 
@@ -352,6 +353,7 @@ void ManipLattice::GetSuccsByGroup(
         // check if hash entry already exists, if not then create one
         int succ_state_id = getOrCreateState(succ_coord, action.back());
         ManipLatticeState* succ_entry = getHashEntry(succ_state_id);
+        succ_entry->source = group;
 
         // check if this state meets the goal criteria
         const bool is_goal_succ = isGoal(action.back());
@@ -380,7 +382,6 @@ void ManipLattice::GetSuccsByGroup(
     if (goal_succ_count > 0) {
         SMPL_DEBUG_NAMED(params()->expands_log, "Got %d goal successors!", goal_succ_count);
     }
-    //getchar();
 }
 
 Stopwatch GetLazySuccsStopwatch("GetLazySuccs", 10);
@@ -415,11 +416,11 @@ void ManipLattice::GetLazySuccs(
 
     const RobotState& source_angles = state_entry->state;
     auto* vis_name = "expansion";
-    SV_SHOW_DEBUG_NAMED(vis_name, getStateVisualization(source_angles, vis_name));
+    SV_SHOW_INFO_NAMED(vis_name, getStateVisualization(source_angles, vis_name));
 
     std::vector<Action> actions;
     if (!m_actions->apply(source_angles, actions)) {
-        SMPL_WARN("Failed to get successors");
+        SMPL_DEBUG("Failed to get successors");
         return;
     }
 
@@ -488,7 +489,7 @@ int ManipLattice::GetTrueCost(int parentID, int childID)
 
     std::vector<Action> actions;
     if (!m_actions->apply(parent_angles, actions)) {
-        SMPL_WARN("Failed to get actions");
+        SMPL_DEBUG("Failed to get actions");
         return -1;
     }
 
@@ -568,7 +569,7 @@ bool ManipLattice::projectToPose(int state_id, Eigen::Affine3d& pose)
 
     std::vector<double> vpose;
     if (!computePlanningFrameFK(m_states[state_id]->state, vpose)) {
-        SMPL_WARN("Failed to compute fk for state %d", state_id);
+        SMPL_DEBUG("Failed to compute fk for state %d", state_id);
         return false;
     }
 
@@ -586,15 +587,23 @@ bool ManipLattice::projectToBasePoint(int state_id, Eigen::Vector3d& pos)
     {   
         std::vector<double> goalConfig(robot()->jointVariableCount());
         computeBaseFrameIK(goal().tgt_off_pose,goalConfig);
-        pos[0] = goalConfig[0];
+         pos[0] = goalConfig[0];
         pos[1] = goalConfig[1];
         pos[2] = goalConfig[2];
     }
     else
     {
-        pos[0] = m_states[state_id]->state[0];
+        /*pos[0] = m_states[state_id]->state[0];
         pos[1] = m_states[state_id]->state[1];
-        pos[2] = m_states[state_id]->state[2];
+        pos[2] = m_states[state_id]->state[2];*/
+        std::vector<double> base;
+        m_fk_iface->computeFK(m_states[state_id]->state,"base",base);
+        //SMPL_DEBUG_STREAM("FK base "<<base[0]<<","<<base[1]<<","<<base[2]);
+        pos[0]=base[0];
+        pos[1]=base[1];
+        pos[2]=base[2];
+        //SMPL_DEBUG_STREAM("FK pose "<<pos[0]<<","<<pos[1]<<","<<pos[2]<<","<<m_states[state_id]->state[3]);
+        
     }  
     return true;
 }
@@ -604,7 +613,7 @@ void ManipLattice::GetPreds(
     std::vector<int>* preds,
     std::vector<int>* costs)
 {
-    SMPL_WARN("GetPreds unimplemented");
+    SMPL_DEBUG("GetPreds unimplemented");
 }
 
 // angles are counterclockwise from 0 to 360 in radians, 0 is the center of bin
@@ -747,7 +756,7 @@ bool ManipLattice::computeBaseFrameIK(
 
     RobotState seed(robot()->jointVariableCount(), 0);
     if (!m_ik_iface->computeIK(pose, seed, state)) {
-        SMPL_WARN("No valid IK solution for the goal pose.");
+        SMPL_DEBUG_STREAM("No valid IK solution for the goal pose "<<pose[0]<<","<<pose[1]<<","<<pose[2]<<","<<pose[3]<<","<<pose[4]<<","<<pose[5]);
     }
 }
 
@@ -777,10 +786,11 @@ bool ManipLattice::checkAction(const RobotState& state, const Action& action)
     // check intermediate states for collisions
     for (size_t iidx = 0; iidx < action.size(); ++iidx) {
         const RobotState& istate = action[iidx];
-        SMPL_DEBUG_STREAM_NAMED(params()->expands_log, "        " << iidx << ": " << istate);
+        //SMPL_DEBUG_STREAM_NAMED(params()->expands_log, "        " << iidx << ": " << istate);
 
-        // check joint limits
         if (!robot()->checkJointLimits(istate)) {
+            SMPL_DEBUG_STREAM_NAMED(params()->expands_log, "        " << iidx << ": " << istate);
+
             SMPL_DEBUG_NAMED(params()->expands_log, "        -> violates joint limits");
             violation_mask |= 0x00000001;
             break;
@@ -808,6 +818,8 @@ bool ManipLattice::checkAction(const RobotState& state, const Action& action)
 
     // check for collisions along path from parent to first waypoint
     if (!collisionChecker()->isStateToStateValid(state, action[0])) {
+        SMPL_DEBUG_STREAM_NAMED(params()->expands_log, "        "  << action[0]);
+
         SMPL_DEBUG_NAMED(params()->expands_log, "        -> path to first waypoint in collision");
         violation_mask |= 0x00000004;
     }
@@ -822,6 +834,8 @@ bool ManipLattice::checkAction(const RobotState& state, const Action& action)
         const RobotState& curr_istate = action[j];
         if (!collisionChecker()->isStateToStateValid(prev_istate, curr_istate))
         {
+            SMPL_DEBUG_STREAM_NAMED(params()->expands_log, "        " << prev_istate);
+
             SMPL_DEBUG_NAMED(params()->expands_log, "        -> path between waypoints %zu and %zu in collision", j - 1, j);
             violation_mask |= 0x00000008;
             break;
@@ -852,7 +866,7 @@ bool ManipLattice::isGoal(const RobotState& state)
         // get pose of planning link
         std::vector<double> pose;
         if (!computePlanningFrameFK(state, pose)) {
-            SMPL_WARN("Failed to compute FK for planning frame");
+            SMPL_DEBUG("Failed to compute FK for planning frame");
             return false;
         }
 
@@ -890,7 +904,7 @@ bool ManipLattice::isGoal(const RobotState& state)
 
 //            const double theta = angles::normalize_angle(Eigen::AngleAxisd(qg.conjugate() * q).angle());
             const double theta = angles::normalize_angle(2.0 * acos(q.dot(qg)));
-            //SMPL_WARN_STREAM("Theta vs. goal tolerance "<<theta<<","<<goal().rpy_tolerance[0]);
+            //SMPL_DEBUG_STREAM("Theta vs. goal tolerance "<<theta<<","<<goal().rpy_tolerance[0]);
             if (theta < goal().rpy_tolerance[0]) {
                 return true;
             }
@@ -901,7 +915,7 @@ bool ManipLattice::isGoal(const RobotState& state)
         // get pose of planning link
         std::vector<double> pose;
         if (!computePlanningFrameFK(state, pose)) {
-            SMPL_WARN("Failed to compute FK for planning frame");
+            SMPL_DEBUG("Failed to compute FK for planning frame");
             return false;
         }
 
@@ -939,7 +953,7 @@ sbpl::motion::GroupType ManipLattice::switchPlanningGroup(int state_id, double s
         // get pose of planning link
         std::vector<double> pose;
         if (!computePlanningFrameFK(state, pose)) {
-            SMPL_WARN("Failed to compute FK for planning frame");
+            SMPL_DEBUG("Failed to compute FK for planning frame");
             return sbpl::motion::GroupType::FAILURE;
         }
 
@@ -990,7 +1004,7 @@ sbpl::motion::GroupType ManipLattice::switchPlanningGroup(int state_id, double s
         // get pose of planning link
         std::vector<double> pose;
         if (!computePlanningFrameFK(state, pose)) {
-            SMPL_WARN("Failed to compute FK for planning frame");
+            SMPL_DEBUG("Failed to compute FK for planning frame");
             return sbpl::motion::GroupType::FAILURE;
         }
 
@@ -1052,6 +1066,45 @@ auto ManipLattice::getStateVisualizationByGroup(const RobotState& state, const s
     return markers;
 }
 
+
+auto ManipLattice::makePathVisualization(
+    const std::vector<RobotState>& path, std::vector<int> sourceGroup) 
+    -> std::vector<visual::Marker>
+{
+    std::vector<visual::Marker> ma;
+
+    if (path.empty()) {
+        return ma;
+    }
+
+    double cinc = 1.0 / double(path.size());
+    for (size_t i = 0; i < path.size(); ++i) {
+        auto markers = collisionChecker()->getCollisionModelVisualization(path[i]);
+
+        for (auto& marker : markers) {
+            const float r = 0.1f;
+            const float g = cinc * (float)(path.size() - (i + 1));
+            const float b = cinc * (float)i;
+            if(sourceGroup[i]==0)
+                marker.color = visual::Color{ 1, 0, 0, 1.0f };
+            else
+                marker.color = visual::Color{ 0, 0, 1, 1.0f };
+        }
+
+        for (auto& m : markers) {
+            ma.push_back(std::move(m));
+        }
+    }
+
+    for (size_t i = 0; i < ma.size(); ++i) {
+        auto& marker = ma[i];
+        marker.ns = "trajectory_source";
+        marker.id = i;
+    }
+
+    return ma;
+}
+
 bool ManipLattice::setStart(const RobotState& state)
 {
     SMPL_DEBUG_NAMED(params()->graph_log, "set the start state");
@@ -1065,15 +1118,15 @@ bool ManipLattice::setStart(const RobotState& state)
 
     // check joint limits of starting configuration
     if (!robot()->checkJointLimits(state, true)) {
-        SMPL_WARN(" -> violates the joint limits");
+        SMPL_DEBUG(" -> violates the joint limits");
         return false;
     }
 
     // check if the start configuration is in collision
     if (!collisionChecker()->isStateValid(state, true)) {
         auto* vis_name = "invalid_start";
-        SV_SHOW_WARN_NAMED(vis_name, collisionChecker()->getCollisionModelVisualization(state));
-        SMPL_WARN(" -> in collision");
+        SV_SHOW_DEBUG_NAMED(vis_name, collisionChecker()->getCollisionModelVisualization(state));
+        SMPL_DEBUG(" -> in collision");
         return false;
     }
 
@@ -1131,7 +1184,7 @@ bool ManipLattice::extractPath(
     }
 
     std::vector<RobotState> opath;
-
+    std::vector<int> statesSource;
     // attempt to handle paths of length 1...do any of the sbpl planners still
     // return a single-point path in some cases?
     if (idpath.size() == 1) {
@@ -1151,10 +1204,11 @@ bool ManipLattice::extractPath(
                 return false;
             }
             opath.push_back(entry->state);
+            statesSource.push_back(entry->source);
         }
 
         auto* vis_name = "goal_config";
-        SV_SHOW_INFO_NAMED(vis_name, getStateVisualization(opath.back(), vis_name));
+        SV_SHOW_DEBUG_NAMED(vis_name, getStateVisualization(opath.back(), vis_name));
         return true;
     }
 
@@ -1171,6 +1225,7 @@ bool ManipLattice::extractPath(
             return false;
         }
         opath.push_back(entry->state);
+        statesSource.push_back(entry->source);
     }
 
     // grab the rest of the points
@@ -1231,6 +1286,7 @@ bool ManipLattice::extractPath(
             }
 
             opath.push_back(best_goal_state->state);
+            statesSource.push_back(best_goal_state->source);
         } else {
             const ManipLatticeState* entry = getHashEntry(curr_id);
             if (!entry) {
@@ -1240,13 +1296,15 @@ bool ManipLattice::extractPath(
 
             SMPL_DEBUG_STREAM_NAMED(params()->graph_log, "Extract successor state " << entry->state);
             opath.push_back(entry->state);
+            statesSource.push_back(entry->source);
         }
     }
 
     // we made it!
     path = std::move(opath);
     auto* vis_name = "goal_config";
-    SV_SHOW_INFO_NAMED(vis_name, getStateVisualization(path.back(), vis_name));
+    SV_SHOW_DEBUG_NAMED(vis_name, getStateVisualization(path.back(), vis_name));
+    SV_SHOW_DEBUG_NAMED("trajectory_source",makePathVisualization(path,statesSource));
     return true;
 }
 
@@ -1318,7 +1376,7 @@ bool ManipLattice::setGoalPose(const GoalConstraint& gc)
             Eigen::AngleAxisd(gc.tgt_off_pose[4], Eigen::Vector3d::UnitY()) *
             Eigen::AngleAxisd(gc.tgt_off_pose[3], Eigen::Vector3d::UnitX()));
     auto* vis_name = "goal_pose";
-    SV_SHOW_INFO_NAMED(vis_name, visual::MakePoseMarkers(goal_pose, m_viz_frame_id, vis_name));
+    SV_SHOW_DEBUG_NAMED(vis_name, visual::MakePoseMarkers(goal_pose, m_viz_frame_id, vis_name));
 
     using namespace std::chrono;
     auto now = clock::now();
@@ -1342,7 +1400,7 @@ bool ManipLattice::setGoalConfiguration(const GoalConstraint& goal)
         goal.type == GoalType::XYZ_RPY_GOAL)
     {
         if (!m_fk_iface) {
-            SMPL_WARN("ForwardKinematicsInterface required for pose goals");
+            SMPL_DEBUG("ForwardKinematicsInterface required for pose goals");
             return false;
         }
     }
