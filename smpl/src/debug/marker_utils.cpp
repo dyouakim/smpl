@@ -66,6 +66,7 @@ auto MakeCubesMarker(
     int id) -> Marker
 {
     visual::Marker marker;
+    marker.pose = Eigen::Affine3d::Identity();
     marker.shape = CubeList{ centers, size };
     marker.color = color;
     marker.frame_id = frame_id;
@@ -83,6 +84,7 @@ auto MakeCubesMarker(
     int id) -> Marker
 {
     visual::Marker marker;
+    marker.pose = Eigen::Affine3d::Identity();
     marker.shape = CubeList{ centers, size };
     marker.color = Colors{ colors };
     marker.frame_id = frame_id;
@@ -100,6 +102,7 @@ auto MakeCubesMarker(
     int id) -> Marker
 {
     visual::Marker marker;
+    marker.pose = Eigen::Affine3d::Identity();
     marker.shape = CubeList{ std::move(centers), size };
     marker.color = color;
     marker.frame_id = frame_id;
@@ -117,6 +120,7 @@ auto MakeCubesMarker(
     int id) -> Marker
 {
     visual::Marker marker;
+    marker.pose = Eigen::Affine3d::Identity();
     marker.shape = CubeList{ std::move(centers), size };
     marker.color = Colors{ std::move(colors) };
     marker.frame_id = frame_id;

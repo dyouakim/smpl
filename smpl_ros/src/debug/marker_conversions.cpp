@@ -96,6 +96,20 @@ void ConvertMarkerToMarkerMsg(
     const Marker& m,
     visualization_msgs::Marker& mm)
 {
+    auto convert_points = [](
+        const std::vector<Eigen::Vector3d>& points)
+        -> std::vector<geometry_msgs::Point>
+    {
+        std::vector<geometry_msgs::Point> new_points(points.size());
+        for (size_t i = 0; i < points.size(); ++i) {
+            auto& point = points[i];
+            new_points[i].x = point.x();
+            new_points[i].y = point.y();
+            new_points[i].z = point.z();
+        }
+        return new_points;
+    };
+
     mm.header.frame_id = m.frame_id;
     mm.ns = m.ns;
     mm.id = m.id;
@@ -126,30 +140,35 @@ void ConvertMarkerToMarkerMsg(
         mm.scale.z = boost::get<Ellipse>(m.shape).axis_z;
         break;
     case SHAPE_CYLINDER:
-        mm.scale.x = boost::get<Cylinder>(m.shape).radius;
-        mm.scale.y = boost::get<Cylinder>(m.shape).radius;
+        mm.scale.x = 2.0 * boost::get<Cylinder>(m.shape).radius;
+        mm.scale.y = 2.0 * boost::get<Cylinder>(m.shape).radius;
         mm.scale.z = boost::get<Cylinder>(m.shape).height;
         mm.type = visualization_msgs::Marker::CYLINDER;
         break;
     case SHAPE_LINE_LIST:
         mm.type = visualization_msgs::Marker::LINE_LIST;
         mm.scale.x = 0.02; // line width
+        mm.points = convert_points(boost::get<LineList>(m.shape).points);
         break;
     case SHAPE_LINE_STRIP:
         mm.type = visualization_msgs::Marker::LINE_STRIP;
         mm.scale.x = 0.02; // line width
+        mm.points = convert_points(boost::get<LineStrip>(m.shape).points);
         break;
     case SHAPE_CUBE_LIST:
         mm.type = visualization_msgs::Marker::CUBE_LIST;
         mm.scale.x = mm.scale.y = mm.scale.z = boost::get<CubeList>(m.shape).size;
+        mm.points = convert_points(boost::get<CubeList>(m.shape).points);
         break;
     case SHAPE_SPHERE_LIST:
         mm.type = visualization_msgs::Marker::SPHERE_LIST;
         mm.scale.x = mm.scale.y = mm.scale.z = 2.0 * boost::get<SphereList>(m.shape).radius;
+        mm.points = convert_points(boost::get<SphereList>(m.shape).points);
         break;
     case SHAPE_POINT_LIST:
         mm.type = visualization_msgs::Marker::POINTS;
         mm.scale.x = mm.scale.y = 0.02; // point width and height
+        mm.points = convert_points(boost::get<PointList>(m.shape).points);
         break;
     case SHAPE_BILLBOARD_TEXT:
         mm.type = visualization_msgs::Marker::TEXT_VIEW_FACING;
@@ -166,6 +185,7 @@ void ConvertMarkerToMarkerMsg(
     case SHAPE_TRIANGLE_LIST:
         mm.type = visualization_msgs::Marker::TRIANGLE_LIST;
         mm.scale.x = mm.scale.y = mm.scale.z = 1.0;
+        mm.points = convert_points(boost::get<TriangleList>(m.shape).vertices);
         break;
     default:
         break;
@@ -205,11 +225,10 @@ void ConvertMarkerToMarkerMsg(
         mm.colors.resize(colors.size());
         for (size_t i = 0; i < colors.size(); ++i) {
             std_msgs::ColorRGBA c;
-            c.r = colors[i].r;
-            c.g = colors[i].g;
-            c.b = colors[i].b;
-            c.a = colors[i].a;
-            mm.colors.push_back(c);
+            mm.colors[i].r = colors[i].r;
+            mm.colors[i].g = colors[i].g;
+            mm.colors[i].b = colors[i].b;
+            mm.colors[i].a = colors[i].a;
         }
     }
 
