@@ -38,7 +38,7 @@
 #include <cmath>
 #include <algorithm>
 #include <set>
-
+#include <smpl/console/console.h>
 namespace sbpl {
 
 #define VECTOR_BUCKET_LIST_INSERT(o, key) \
@@ -144,10 +144,10 @@ DistanceMap<Derived>::DistanceMap(
     for (int i = 0; i < m_dmax_sqrd_int + 1; ++i) {
         m_sqrt_table[i] = m_res * std::sqrt((double)i);
     }
-
+    
     // init neighbors for forward propagation
     CreateNeighborUpdateList(m_neighbors, m_indices, m_neighbor_ranges);
-
+    
     for (size_t i = 0; i < m_indices.size(); ++i) {
         const Eigen::Vector3i& neighbor = m_neighbors[m_indices[i]];
         m_neighbor_offsets[i] = 0;
@@ -161,21 +161,19 @@ DistanceMap<Derived>::DistanceMap(
             m_neighbor_dirs[i] = dirnum(neighbor.x(), neighbor.y(), neighbor.z(), 1);
         }
     }
-
     // initialize non-border free cells
     m_cells.resize(cell_count_x, cell_count_y, cell_count_z);
     for (int x = 1; x < m_cells.xsize() - 1; ++x) {
     for (int y = 1; y < m_cells.ysize() - 1; ++y) {
     for (int z = 1; z < m_cells.zsize() - 1; ++z) {
-        Cell& c = m_cells(x, y, z);
+        /*Cell& c = m_cells(x, y, z);
         resetCell(c);
         c.x = x;
         c.y = y;
-        c.z = z;
+        c.z = z;*/
     }
     }
     }
-
     initBorderCells();
     propagateBorder();
 }
@@ -474,6 +472,17 @@ int DistanceMap<Derived>::numCellsZ() const
     return m_cells.zsize() - 2;
 }
 
+/// Return the number of times a cell is crossed by the search during its lifetime.
+template <typename Derived>
+int DistanceMap<Derived>::getCrossCellCount(double x, double y, double z) const
+{
+    int gx,gy,gz;
+    worldToGrid(x,y,z,gx,gy,gz);
+     Cell& c = m_cells(gx, gy, gz);
+     return c.counter;
+
+}
+
 template <typename Derived>
 double DistanceMap<Derived>::getUninitializedDistance() const
 {
@@ -764,7 +773,7 @@ void DistanceMap<Derived>::propagateRemovals()
 template <typename Derived>
 void DistanceMap<Derived>::propagateBorder()
 {
-    while (m_bucket < (int)m_open.size()) {
+   while (m_bucket < (int)m_open.size()) {
         while (!m_open[m_bucket].empty()) {
             assert(m_bucket >= 0 && m_bucket < m_open.size());
             Cell* s;
