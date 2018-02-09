@@ -409,16 +409,23 @@ bool VoxelizeOcTree(
     const Eigen::Vector3d& go,
     std::vector<Eigen::Vector3d>& voxels)
 {
+            ROS_WARN("%f, %f, %f, %f", pose(0, 0), pose(0, 1), pose(0, 2), pose(0, 3));
+            ROS_WARN("%f, %f, %f, %f", pose(1, 0), pose(1, 1), pose(1, 2), pose(1, 3));
+            ROS_WARN("%f, %f, %f, %f", pose(2, 0), pose(2, 1), pose(2, 2), pose(2, 3));
+            ROS_WARN("%f, %f, %f, %f", pose(3, 0), pose(3, 1), pose(3, 2), pose(3, 3));
     auto tree = octree.octree;
     for (auto lit = tree->begin_leafs(); lit != tree->end_leafs(); ++lit) {
         if (tree->isNodeOccupied(*lit)) {
             if (lit.getSize() <= res) {
-                voxels.push_back(Eigen::Vector3d(lit.getX(), lit.getY(), lit.getZ()));
+                Eigen::Vector3d p(lit.getX(), lit.getY(), lit.getZ());
+                p = pose * p;
+                voxels.push_back(p);
             } else {
                 double ceil_val = ceil(lit.getSize() / res) * res;
                 for (double x = lit.getX() - ceil_val; x < lit.getX() + ceil_val; x += res) {
                 for (double y = lit.getY() - ceil_val; y < lit.getY() + ceil_val; y += res) {
                 for (double z = lit.getZ() - ceil_val; z < lit.getZ() + ceil_val; z += res) {
+
                     Eigen::Vector3d pt(x, y, z);
                     pt = pose * pt;
                     voxels.push_back(pt);
