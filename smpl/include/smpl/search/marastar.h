@@ -179,6 +179,7 @@ private:
     //multi_index_intrusive_heap<SearchState, SearchStateCompare> m_open;
     
     multi_index_intrusive_heap<SearchState, SearchStateCompareBase> m_open_base;
+    multi_index_intrusive_heap<SearchState, SearchStateCompareBase> m_open_base_iso;
     multi_index_intrusive_heap<SearchState, SearchStateCompareArm> m_open_arm;
 
     std::vector<SearchState*> m_incons;

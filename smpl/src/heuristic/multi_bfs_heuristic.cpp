@@ -67,8 +67,9 @@ void MultiBfsHeuristic::updateGoal(const GoalConstraint& goal)
     SMPL_DEBUG_NAMED(LOG, "Setting the BFS heuristic goal (%d, %d, %d)", gx, gy, gz);
     SMPL_ERROR_STREAM("Origin_arm "<<gx<<","<<gy<<","<<gz);
     
-    int listSize = std::floor((double)(0.3/grid()->resolution()))*2+1;
+    int listSize = ((double)(1.8/grid()->resolution()))+1;
     std::vector<int> inputGoals(pow(listSize,3)*3);
+    std::vector<Eigen::Vector3d> centers;
     SMPL_ERROR_STREAM("Goal Region Size "<<listSize<<" resolution "<<grid()->resolution()<<" total size "<<inputGoals.size());
     int idx = 0;
     int xSign = 1,ySign = 1, zSign = 1;
@@ -78,34 +79,54 @@ void MultiBfsHeuristic::updateGoal(const GoalConstraint& goal)
            for(int k=0;k<listSize;k++)
             {   
                 if(i>listSize/2)
-                    xSign = -(i-(listSize/2));
+                    xSign = -(i-std::ceil(listSize/2));
                 else
                     xSign = i;
                 if(j>listSize/2)
-                    ySign = -(j-(listSize/2));
+                    ySign = -(j-std::ceil(listSize/2));
                 else
-                    ySign=j;
-                if(zSign>listSize/2)
-                    zSign = -(k-(listSize/2));
+                    ySign = j;
+                if(k>listSize/2)
+                    zSign = -(k-std::ceil(listSize/2));
                 else
-                    zSign=k;
+                    zSign = k;
                 inputGoals[idx]  = gx + xSign;
                 inputGoals[idx+1] = gy + ySign;
                 inputGoals[idx+2] = gz + zSign;
-                SMPL_ERROR_STREAM("indices: "<<i<<","<<j<<","<<k);
+                /*SMPL_ERROR_STREAM("indices: "<<i<<","<<j<<","<<k);
                 SMPL_ERROR_STREAM("Element at  ["<<
                     idx<<","<<(idx+1)<<","<<(idx+2)<<"] is "<<
-                    inputGoals[idx]<<","<<inputGoals[idx+1]<<","<<inputGoals[idx+2]); 
+                    inputGoals[idx]<<","<<inputGoals[idx+1]<<","<<inputGoals[idx+2]); */
+                
+                Eigen::Vector3d p;
+                grid()->gridToWorld( inputGoals[idx],  inputGoals[idx+1],  inputGoals[idx+2], p.x(), p.y(), p.z());
+                centers.push_back(p);
                 idx+=3; 
             }
     }
 
-    m_bfs[GroupType::BASE]->run < std::vector<int>::iterator >(inputGoals.begin(),inputGoals.end());
+    visual::Color color;
+    color.r = 238.0f / 255.0f;
+    color.g = 100.0f / 255.0f;
+    color.b = 149.0f / 255.0f;
+    color.a = 1.0f;
+    
+    SV_SHOW_INFO (visual::MakeCubesMarker(
+            centers,
+            grid()->resolution(),
+            color,
+            grid()->getReferenceFrame(),
+            "bfs_base_goals"));
 
-    if (!m_bfs[GroupType::ARM]->inBounds(gx, gy, gz)) {
+    int numGoals = m_bfs[GroupType::BASE]->run < std::vector<int>::iterator >(inputGoals.begin(),inputGoals.end());
+
+    if (!m_bfs[GroupType::ARM]->inBounds(gx, gy, gz) || !numGoals) {
         SMPL_ERROR_NAMED(LOG, "Heuristic goal is out of BFS bounds");
     }
-
+    else
+    {
+        SMPL_ERROR_STREAM("Number of base goal added "<<numGoals);
+    }
 
     m_bfs[GroupType::ARM]->run(gx, gy, gz);
 
@@ -195,7 +216,6 @@ int MultiBfsHeuristic::GetGoalHeuristic(int state_id)
 
     Eigen::Vector3i dp;
     grid()->worldToGrid(p.x(), p.y(), p.z(), dp.x(), dp.y(), dp.z());
-
     return getBfsCostToGoal(*m_bfs[GroupType::ARM], dp.x(), dp.y(), dp.z());
 }
 
@@ -209,12 +229,15 @@ int MultiBfsHeuristic::GetGoalHeuristic(int state_id, int planning_group, int ba
     Eigen::Vector3d p;
     if(planning_group==GroupType::BASE)
     {
-        if (!m_pp->projectToBasePoint(state_id, p)) {
+        if (state_id==0)
+            return 0;
+
+        else if (!m_pp->projectToBasePoint(state_id, p)) {
             return 0;
         }
     }
     else
-    {
+    {   
         if (!m_pp->projectToPoint(state_id, p)) {
             return 0;
         }
@@ -222,8 +245,12 @@ int MultiBfsHeuristic::GetGoalHeuristic(int state_id, int planning_group, int ba
 
     Eigen::Vector3i dp;
     grid()->worldToGrid(p.x(), p.y(), p.z(), dp.x(), dp.y(), dp.z());
+   /* SMPL_WARN_STREAM("Getting distance heursitic for group "<<planning_group);
+    SMPL_WARN_STREAM("get heursitic for grid point "<<dp.x()<<","<<dp.y()<<","<<dp.z());
+    SMPL_WARN_STREAM("get heursitic for world point "<<p.x()<<","<<p.y()<<","<<p.z());*/
     
-   return getBfsCostToGoal(*m_bfs[planning_group], dp.x(), dp.y(), dp.z());
+   int cost  = getBfsCostToGoal(*m_bfs[planning_group], dp.x(), dp.y(), dp.z());
+   return cost;
 }
 
 int MultiBfsHeuristic::GetStartHeuristic(int state_id)
@@ -252,7 +279,7 @@ auto MultiBfsHeuristic::getWallsVisualization() const -> visual::Marker
     for (int x = 0; x < dimX; x++) {
     for (int y = 0; y < dimY; y++) {
     for (int z = 0; z < dimZ; z++) {
-        if (m_bfs[GroupType::ARM]->isWall(x, y, z)) {
+        if (m_bfs[GroupType::BASE]->isWall(x, y, z)) {
             Eigen::Vector3d p;
             grid()->gridToWorld(x, y, z, p.x(), p.y(), p.z());
             centers.push_back(p);
@@ -261,7 +288,7 @@ auto MultiBfsHeuristic::getWallsVisualization() const -> visual::Marker
     }
     }
 
-    SMPL_DEBUG_NAMED(LOG, "BFS Visualization contains %zu points", centers.size());
+    SMPL_ERROR_NAMED(LOG, "BFS Visualization contains %zu points", centers.size());
 
     visual::Color color;
     color.r = 100.0f / 255.0f;
@@ -274,6 +301,7 @@ auto MultiBfsHeuristic::getWallsVisualization() const -> visual::Marker
             color,
             grid()->getReferenceFrame(),
             "bfs_walls");
+
 }
 
 auto MultiBfsHeuristic::getValuesVisualization() -> visual::Marker
@@ -282,7 +310,7 @@ auto MultiBfsHeuristic::getValuesVisualization() -> visual::Marker
         return visual::MakeEmptyMarker();
     }
 
-    if (m_bfs[GroupType::ARM]->isWall(m_goal_x, m_goal_y, m_goal_z)) {
+    if (m_bfs[GroupType::BASE]->isWall(m_goal_x, m_goal_y, m_goal_z)) {
         return visual::MakeEmptyMarker();
     }
 
@@ -344,14 +372,17 @@ auto MultiBfsHeuristic::getValuesVisualization() -> visual::Marker
 
             Eigen::Vector3d p;
             grid()->gridToWorld(c.x, c.y, c.z, p.x(), p.y(), p.z());
-            points.push_back(p);
+            if (std::fabs(p.z() -  3.73) < 1) {
+
+                            points.push_back(p);
 
             colors.push_back(color);
+            } 
         }
 
 //        visited(c.x, c.y, c.z) = true;
 
-        const int d = m_cost_per_cell * m_bfs[GroupType::ARM]->getDistance(c.x, c.y, c.z);
+        const int d = m_cost_per_cell * m_bfs[GroupType::BASE]->getDistance(c.x, c.y, c.z);
 
         for (int dx = -1; dx <= 1; ++dx) {
         for (int dy = -1; dy <= 1; ++dy) {
@@ -365,7 +396,7 @@ auto MultiBfsHeuristic::getValuesVisualization() -> visual::Marker
             int sz = c.z + dz;
 
             // check if neighbor is valid
-            if (!m_bfs[GroupType::ARM]->inBounds(sx, sy, sz) || m_bfs[GroupType::ARM]->isWall(sx, sy, sz)) {
+            if (!m_bfs[GroupType::BASE]->inBounds(sx, sy, sz) || m_bfs[GroupType::BASE]->isWall(sx, sy, sz)) {
                 continue;
             }
 
@@ -376,14 +407,14 @@ auto MultiBfsHeuristic::getValuesVisualization() -> visual::Marker
 
             visited(sx, sy, sz) = true;
 
-            int dd = m_cost_per_cell * m_bfs[GroupType::ARM]->getDistance(sx, sy, sz);
+            int dd = m_cost_per_cell * m_bfs[GroupType::BASE]->getDistance(sx, sy, sz);
             cells.push({sx, sy, sz, dd});
         }
         }
         }
     }
 
-    return visual::MakeCubesMarker(
+     return visual::MakeCubesMarker(
             std::move(points),
             0.5 * grid()->resolution(),
             std::move(colors),
@@ -421,8 +452,8 @@ void MultiBfsHeuristic::syncGridAndBfs()
         }
     }
 
-    SMPL_DEBUG_NAMED(LOG, "%d/%d (%0.3f%%) walls in the bfs heuristic", wall_count, cell_count, 100.0 * (double)wall_count / cell_count);
-    SMPL_DEBUG_NAMED(LOG, "%d/%d (%0.3f%%) walls in the base bfs heuristic", base_wall_count, cell_count, 100.0 * (double)base_wall_count / cell_count);
+    SMPL_ERROR_NAMED(LOG, "%d/%d (%0.3f%%) walls in the bfs heuristic", wall_count, cell_count, 100.0 * (double)wall_count / cell_count);
+    SMPL_ERROR_NAMED(LOG, "%d/%d (%0.3f%%) walls in the base bfs heuristic", base_wall_count, cell_count, 100.0 * (double)base_wall_count / cell_count);
 }
 
 int MultiBfsHeuristic::getBfsCostToGoal(const BFS_3D& bfs, int x, int y, int z) const

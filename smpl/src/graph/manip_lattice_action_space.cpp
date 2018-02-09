@@ -410,6 +410,13 @@ bool ManipLatticeActionSpace::apply(
                if (getAction(parent, goal_dist, start_dist, mp, act)) {
                 actions.insert(actions.end(), act.begin(), act.end());
                 weights.push_back(mp.weight);
+               /* SMPL_WARN_STREAM("New Action fetched for group "<<group<<" with size "<<act.size()<<" and values of each: ");
+                for(int i=0;i<act[0].size();i++)
+                    for(size_t j = 0; j < act[0][i].size(); ++j)
+                        {
+                            SMPL_WARN_STREAM("First dim size "<<act[0].size()<<" Second "<<act[0][i].size());
+                            SMPL_WARN_STREAM("val["<<i<<","<<j<<"] "<<(act[0][i][j]));
+                        }*/
                 }
              }
              

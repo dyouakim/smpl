@@ -76,6 +76,7 @@
 #include <smpl/search/trastar.h>
 #include <smpl/search/marastar.h>
 #include <smpl/search/experience_graph_planner.h>
+#include <leatherman/binvox.h>
 
 namespace sbpl {
 namespace motion {
@@ -979,8 +980,10 @@ bool PlannerInterface::solve(
         ROS_DEBUG_STREAM_NAMED(PI_LOGGER, "  " << pidx << ": " << point);
     }
 
+    ROS_ERROR_STREAM("before post process!");
     postProcessPath(path);
-    SV_SHOW_INFO(makePathVisualization(path));
+    ROS_ERROR_STREAM("after post process!");
+    SV_SHOW_INFO_NAMED("trajectory", makePathVisualization(path));
 
     ROS_DEBUG_NAMED(PI_LOGGER, "smoothed path:");
     for (size_t pidx = 0; pidx < path.size(); ++pidx) {
@@ -1001,8 +1004,13 @@ bool PlannerInterface::solve(
 //    removeZeroDurationSegments(traj);
 
     auto now = clock::now();
+    //keep statistical metrics for benchmarking (expansion & epsilon...TODO change the response message to add the cost as well)
+   
     res.planning_time = to_seconds(now - then);
+    res.iterations = m_planner->get_n_expands();
+    res.cost = m_planner->get_final_epsilon();
     m_res = res; // record the last result
+    
     return true;
 }
 
@@ -1026,16 +1034,12 @@ bool PlannerInterface::setStart(const moveit_msgs::RobotState& state)
 {
     ROS_INFO_NAMED(PI_LOGGER, "set start configuration");
 
-    if (!state.multi_dof_joint_state.joint_names.empty()) {
-        const auto& mdof_joint_names = state.multi_dof_joint_state.joint_names;
-        for (const std::string& joint_name : m_robot->getPlanningJoints()) {
-            auto it = std::find(mdof_joint_names.begin(), mdof_joint_names.end(), joint_name);
-            if (it != mdof_joint_names.end()) {
-                ROS_WARN_NAMED(PI_LOGGER, "planner does not currently support planning for multi-dof joints. found '%s' in planning joints", joint_name.c_str());
-            }
-        }
-    }
-
+    /*std::string file_name = "../g500_csip/g500_csip_benchmarks/objects/subsea_controller/binvox_subsea";
+    bool res = leatherman::createBinvoxFile("../g500_csip/g500_csip_benchmarks/objects/subsea_controller/subsea_controller.stl",file_name);
+    if(res)
+        ROS_WARN("created!");
+    else
+        ROS_WARN("failed!");*/
     RobotState initial_positions;
     std::vector<std::string> missing;
     if (!leatherman::getJointPositions(
@@ -1045,7 +1049,7 @@ bool PlannerInterface::setStart(const moveit_msgs::RobotState& state)
             initial_positions,
             missing))
     {
-        ROS_ERROR_STREAM("start state is missing planning joints: " << missing);
+         ROS_ERROR_STREAM("start state is missing planning joints: " << missing);
         return false;
     }
 
@@ -1225,8 +1229,8 @@ bool PlannerInterface::plan(double allowed_time, std::vector<RobotState>& path)
     // NOTE: this should be done after setting the start/goal in the environment
     // to allow the heuristic to tailor the visualization to the current
     // scenario
-    SV_SHOW_INFO(getBfsWallsVisualization());
-    SV_SHOW_INFO(getBfsValuesVisualization());
+    SV_SHOW_INFO_NAMED("bfs_walls", getBfsWallsVisualization());
+    SV_SHOW_INFO_NAMED("bfs_values", getBfsValuesVisualization());
 
     ROS_WARN_NAMED(PI_LOGGER, "Planning!!!!!");
     bool b_ret = false;
@@ -1261,6 +1265,7 @@ bool PlannerInterface::plan(double allowed_time, std::vector<RobotState>& path)
             ROS_ERROR("Failed to convert state id path to joint variable path");
             return false;
         }
+
     }
     return b_ret;
 }
@@ -1513,6 +1518,8 @@ auto PlannerInterface::getBfsValuesVisualization() const -> visual::Marker
         return hmfbfs->getValuesVisualization();
     } else if (auto* debfs = dynamic_cast<DijkstraEgraphHeuristic3D*>(first->second.get())) {
         return debfs->getValuesVisualization();
+    }  else if(auto* mhbfs = dynamic_cast<MultiBfsHeuristic*>(first->second.get())){
+        return mhbfs->getValuesVisualization();
     } else {
         return visual::Marker{ };
     }
@@ -1530,6 +1537,8 @@ auto PlannerInterface::getBfsWallsVisualization() const -> visual::Marker
         return hbfs->getWallsVisualization();
     } else if (auto* hmfbfs = dynamic_cast<MultiFrameBfsHeuristic*>(first->second.get())) {
         return hmfbfs->getWallsVisualization();
+    } else if(auto* mhbfs = dynamic_cast<MultiBfsHeuristic*>(first->second.get())){
+        return mhbfs->getWallsVisualization();
     } else if (auto* debfs = dynamic_cast<DijkstraEgraphHeuristic3D*>(first->second.get())) {
         return debfs->getWallsVisualization();
     } else {

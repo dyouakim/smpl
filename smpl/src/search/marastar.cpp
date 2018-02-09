@@ -32,6 +32,7 @@ MARAStar::MARAStar(
     m_incons(),
     m_curr_eps(1.0),
     m_open_base(),
+    m_open_base_iso(),
     m_open_arm(),
     m_iteration(1),
     m_call_number(0),
@@ -101,16 +102,21 @@ int MARAStar::replan(
         SMPL_DEBUG_NAMED(SLOG, "Reinitialize search");
         m_open_arm.clear(sbpl::motion::BASE);
         m_open_base.clear(sbpl::motion::ARM);
+        m_open_base_iso.clear(sbpl::motion::BASE_ISO);
         m_incons.clear();
         ++m_call_number; // trigger state reinitializations
 
+
+        SMPL_ERROR_NAMED(SLOG, "Reinitialize search start");
         reinitSearchState(start_state);
+        SMPL_ERROR_NAMED(SLOG, "Reinitialize search goal");
         reinitSearchState(goal_state);
 
         start_state->g = 0;
         start_state->f[0] = computeKey(start_state,sbpl::motion::GroupType::BASE);
         start_state->f[1] = computeKey(start_state,sbpl::motion::GroupType::ARM);
         m_open_base.push(start_state,sbpl::motion::GroupType::BASE);
+        m_open_base_iso.push(start_state,sbpl::motion::GroupType::BASE_ISO);
         m_open_arm.push(start_state,sbpl::motion::GroupType::ARM);
 
         m_iteration = 1; // 0 reserved for "not closed on any iteration"
@@ -142,7 +148,6 @@ int MARAStar::replan(
 
     int err;
     while (m_satisfied_eps > m_final_eps) {
-
         //TODO check how to handle this for the multi search thing
         if (m_curr_eps == m_satisfied_eps) {
             if (!m_time_params.improve) {
@@ -154,16 +159,21 @@ int MARAStar::replan(
             m_curr_eps = std::max(m_curr_eps, m_final_eps);
             
             for (SearchState* s : m_incons) {
+
+                SMPL_DEBUG("pushing incons state!");
                 s->incons = false;
                 m_open_base.push(s,sbpl::motion::GroupType::BASE);
+                m_open_base_iso.push(s,sbpl::motion::GroupType::BASE_ISO);
                 m_open_arm.push(s,sbpl::motion::GroupType::ARM);
             }
+            SMPL_DEBUG_STREAM("after for loop call reorder");
+            
             reorderOpen();
             m_incons.clear();
             SMPL_DEBUG_NAMED(SLOG, "Begin new search iteration %d with epsilon = %0.3f", m_iteration, m_curr_eps);
         }
          err = improvePath(start_time, goal_state, num_expansions, elapsed_time);
-        if (m_curr_eps == m_initial_eps) {
+         if (m_curr_eps == m_initial_eps) {
             m_expand_count_init += num_expansions;
             m_search_time_init += elapsed_time;
         }
@@ -182,6 +192,11 @@ int MARAStar::replan(
     if (m_satisfied_eps == std::numeric_limits<double>::infinity()) {
         if (m_allow_partial_solutions && !m_open_base.empty()) {
             SearchState* next_state = m_open_base.min();
+            extractPath(next_state, *solution, *cost);
+            return !SUCCESS;
+        }
+        if (m_allow_partial_solutions && !m_open_base_iso.empty()) {
+            SearchState* next_state = m_open_base_iso.min();
             extractPath(next_state, *solution, *cost);
             return !SUCCESS;
         }
@@ -277,6 +292,7 @@ int MARAStar::force_planning_from_scratch_and_free_memory()
 {
     force_planning_from_scratch();
     m_open_base.clear(sbpl::motion::GroupType::BASE);
+    m_open_base_iso.clear(sbpl::motion::GroupType::BASE_ISO);
     m_open_arm.clear(sbpl::motion::GroupType::ARM);
 
     for (SearchState* s : m_states) {
@@ -298,7 +314,7 @@ double MARAStar::get_solution_eps() const
 /// Return the number of expansions made in progress to the final solution.
 int MARAStar::get_n_expands() const
 {
-    return m_expand_count/2;
+    return m_expand_count/3;
 }
 
 /// Return the initial suboptimality bound
@@ -400,7 +416,7 @@ void MARAStar::recomputeHeuristics()
         s->h[0] = h_temp[index];//std::accumulate(h_temp.begin(), h_temp.end(), 0LL)/h_temp.size();
         */s->h[1] = m_heur->GetGoalHeuristic(s->state_id, sbpl::motion::GroupType::ARM,sbpl::motion::BaseGroupHeuristic::NONE);
         
-        SMPL_DEBUG_STREAM("Base heuristic is "<<s->h[0]<<" arm heuristic is "<<s->h[1]);
+        SMPL_DEBUG_STREAM("Recompute: Base heuristic is "<<s->h[0]<<" arm heuristic is "<<s->h[1]);
         }
     }
 }
@@ -464,6 +480,8 @@ bool MARAStar::timedOut(
             return elapsed_expansions >= m_time_params.max_expansions;
         }
     case TimeParameters::TIME:
+    SMPL_DEBUG_STREAM("in time case "<<to_seconds(elapsed_time)<<" allowed init "<<to_seconds(m_time_params.max_allowed_time_init)<<" allowed "<<to_seconds(m_time_params.max_allowed_time));
+            
         if (m_satisfied_eps == std::numeric_limits<double>::infinity()) {
             return elapsed_time >= m_time_params.max_allowed_time_init;
         } else {
@@ -485,11 +503,58 @@ int MARAStar::improvePath(
     int& elapsed_expansions,
     clock::duration& elapsed_time)
 {
-    bool empty = m_open_base.empty() || m_open_arm.empty();
+    bool empty = m_open_base.empty() || m_open_arm.empty();// || m_open_base_iso.empty();
     while (!empty) {
             
             
             SearchState* min_state;
+            auto now = clock::now();
+            elapsed_time = now - start_time;
+            
+            if(!m_open_base_iso.empty())
+            {
+                min_state = m_open_base_iso.min();
+
+                SMPL_DEBUG_STREAM("Base_iso min state "<<min_state->state_id<<" and f-val "<<min_state->f[0]);
+                auto now = clock::now();
+                elapsed_time = now - start_time;
+
+                // path to goal found
+                
+                if (min_state->f[0] >= goal_state->f[0] || min_state->f[1] >= goal_state->f[1] || min_state == goal_state) {
+                    SMPL_DEBUG_NAMED(SLOG, "Found path to goal");
+                    return SUCCESS;
+                }
+
+            
+                if (timedOut(elapsed_expansions, elapsed_time)) {
+                    SMPL_DEBUG_NAMED(SLOG, "BASE_ISO Ran out of time");
+                    return TIMED_OUT;
+                }
+
+                SMPL_DEBUG_NAMED(SELOG, "Expand state %d", min_state->state_id);
+                
+                m_open_base_iso.pop(sbpl::motion::GroupType::BASE_ISO);
+                
+
+                assert(min_state->iteration_closed[sbpl::motion::GroupType::BASE] != m_iteration);
+                assert(min_state->g != INFINITECOST);
+                min_state->iteration_closed[sbpl::motion::GroupType::BASE] = m_iteration;
+
+                assert(min_state->iteration_closed[sbpl::motion::GroupType::ARM] != m_iteration);
+                assert(min_state->g != INFINITECOST);
+                min_state->iteration_closed[sbpl::motion::GroupType::ARM] = m_iteration;
+
+                min_state->eg = min_state->g;
+
+                expand(min_state, sbpl::motion::GroupType(sbpl::motion::GroupType::BASE_ISO));
+
+                ++ elapsed_expansions;
+            }
+
+            SMPL_DEBUG_STREAM("base_iso path condition first "<<(min_state->f[0] >= goal_state->f[0])<<
+                "first arm "<<(min_state->f[1] >= goal_state->f[1])<<
+                ",second "<<(min_state == goal_state));
 
             if(!m_open_base.empty())
             {
@@ -500,20 +565,20 @@ int MARAStar::improvePath(
                 elapsed_time = now - start_time;
 
                 // path to goal found
-                if (min_state->f[0] >= goal_state->f[0] || min_state == goal_state) {
+                
+                if (min_state->f[0] >= goal_state->f[0] || min_state->f[1] >= goal_state->f[1] || min_state == goal_state) {
                     SMPL_DEBUG_NAMED(SLOG, "Found path to goal");
                     return SUCCESS;
                 }
 
             
                 if (timedOut(elapsed_expansions, elapsed_time)) {
-                    SMPL_DEBUG_NAMED(SLOG, "Ran out of time");
+                    SMPL_DEBUG_NAMED(SLOG, "BASE Ran out of time");
                     return TIMED_OUT;
                 }
 
                 SMPL_DEBUG_NAMED(SELOG, "Expand state %d", min_state->state_id);
-                //SMPL_DEBUG_STREAM("Expanding state for "<<current_planning_group<<" with id "<<min_state->state_id<< " with f-val "<<min_state->f<<" h-val "<<min_state->h);
-
+                
                 m_open_base.pop(sbpl::motion::GroupType::BASE);
                 
                 assert(min_state->iteration_closed[sbpl::motion::GroupType::BASE] != m_iteration);
@@ -531,6 +596,12 @@ int MARAStar::improvePath(
                 ++ elapsed_expansions;
             }
 
+            
+
+            SMPL_DEBUG_STREAM("base path condition first "<<(min_state->f[0] >= goal_state->f[0])<<
+                "first arm "<<(min_state->f[1] >= goal_state->f[1])<<
+                ",second "<<(min_state == goal_state));
+
             if(!m_open_arm.empty())
             {
                 min_state = m_open_arm.min();
@@ -538,13 +609,13 @@ int MARAStar::improvePath(
                 SMPL_DEBUG_STREAM("Arm min state "<<min_state->state_id<<" and f-val "<<min_state->f[1]);
 
                 // path to goal found
-                if (min_state->f[1] >= goal_state->f[1] || min_state == goal_state) {
+                if (min_state->f[1] >= goal_state->f[1] || min_state->f[0] >= goal_state->f[0] || min_state == goal_state) {
                     SMPL_DEBUG_NAMED(SLOG, "Found path to goal");
                     return SUCCESS;
                 }
 
                 if (timedOut(elapsed_expansions, elapsed_time)) {
-                    SMPL_DEBUG_NAMED(SLOG, "Ran out of time");
+                    SMPL_DEBUG_NAMED(SLOG, "ARM Ran out of time");
                     return TIMED_OUT;
                 }
 
@@ -567,7 +638,11 @@ int MARAStar::improvePath(
 
                 ++ elapsed_expansions;
             }
-            empty = m_open_base.empty() || m_open_arm.empty();
+            SMPL_DEBUG_STREAM("arm path condition "<<(min_state->f[0] >= goal_state->f[0])<<
+                "first arm "<<(min_state->f[1] >= goal_state->f[1])<<
+                ",second "<<(min_state == goal_state));
+            empty = m_open_base.empty() || m_open_arm.empty();// || m_open_base_iso.empty();
+            SMPL_DEBUG_STREAM("one full cycle done. base_iso:"<<m_open_base_iso.empty()<<",base: "<<m_open_base.empty()<<",arm:"<<m_open_arm.empty()<<" and both:"<<empty);
     }
 
     return EXHAUSTED_OPEN_LIST;
@@ -632,56 +707,128 @@ void MARAStar::expand(SearchState* s, sbpl::motion::GroupType group)
 
     std::vector<int> base_succs, arm_succs, base_costs, arm_costs;
 
-    m_space->GetSuccsByGroup(s->state_id, &m_succs, &m_costs, group); 
-    
- 
-    SMPL_INFO_STREAM("group "<<group<<" has "<<m_succs.size()<<" successors");
-    
-    for (size_t sidx = 0; sidx < m_succs.size(); ++sidx) {
-        int succ_state_id = m_succs[sidx];
-        int cost = m_costs[sidx];
+    if(group==sbpl::motion::GroupType::BASE_ISO)
+    {
+        m_space->GetSuccsByGroup(s->state_id, &m_succs, &m_costs, sbpl::motion::GroupType::BASE); 
+        
+     
+        SMPL_DEBUG_STREAM("group "<<group<<" has "<<m_succs.size()<<" successors");
+        
+        for (size_t sidx = 0; sidx < m_succs.size(); ++sidx) {
+            int succ_state_id = m_succs[sidx];
+            int cost = m_costs[sidx];
 
-        SearchState* succ_state = getSearchState(succ_state_id);
-        reinitSearchState(succ_state);
+            SearchState* succ_state = getSearchState(succ_state_id);
+            reinitSearchState(succ_state);
 
-        int new_cost = s->eg + cost;
-        SMPL_INFO_NAMED(SELOG, "Compare new cost %d vs old cost %d", new_cost, succ_state->g);
-        if (new_cost < succ_state->g) {
-            succ_state->g = new_cost;
-            succ_state->bp = s;
+            int new_cost = s->eg + cost;
+            SMPL_DEBUG_NAMED(SELOG, "Compare new cost %d vs old cost %d", new_cost, succ_state->g);
+            if (new_cost < succ_state->g) {
+                succ_state->g = new_cost;
+                succ_state->bp = s;
 
-            if (succ_state->iteration_closed[sbpl::motion::BASE] != m_iteration) {
-                succ_state->f[0] = computeKey(succ_state,sbpl::motion::BASE);
-                
-                SMPL_DEBUG_STREAM("State "<<succ_state->state_id<< " has base f-val "<<succ_state->f[0]);
-                if (m_open_base.contains(succ_state,sbpl::motion::BASE)) {
-                    SMPL_DEBUG_STREAM("State "<<succ_state->state_id<< " has already been expanded in base decrease priority!");
-                    m_open_base.decrease(succ_state,sbpl::motion::BASE);
+
+                if (succ_state->iteration_closed[sbpl::motion::BASE] != m_iteration) {
+                    succ_state->f[0] = computeKey(succ_state,sbpl::motion::BASE);
+                    
+                    SMPL_DEBUG_STREAM("State "<<succ_state->state_id<< " has base_iso f-val "<<succ_state->f[0]);
+                    if (m_open_base_iso.contains(succ_state,sbpl::motion::BASE_ISO)) {
+                        SMPL_DEBUG_STREAM("State "<<succ_state->state_id<< " has already been expanded in base decrease priority!");
+                        m_open_base_iso.decrease(succ_state,sbpl::motion::BASE_ISO);
+                    }
+                    else {
+                        m_open_base_iso.push(succ_state,sbpl::motion::BASE_ISO);
+                        SMPL_DEBUG_STREAM("State "<<succ_state->state_id<< " has never been expanded, added to base_iso open list!");
+                    }
+
+
+                    SMPL_DEBUG_STREAM("State "<<succ_state->state_id<< " has base f-val "<<succ_state->f[0]);
+                    if (m_open_base.contains(succ_state,sbpl::motion::BASE)) {
+                        SMPL_DEBUG_STREAM("State "<<succ_state->state_id<< " has already been expanded in base decrease priority!");
+                        m_open_base.decrease(succ_state,sbpl::motion::BASE);
+                    }
+                    else {
+                        m_open_base.push(succ_state,sbpl::motion::BASE);
+                        SMPL_DEBUG_STREAM("State "<<succ_state->state_id<< " has never been expanded, added to base open list!");
+                    }
+                } else if (!succ_state->incons) {
+                    m_incons.push_back(succ_state);
                 }
-                else {
-                    m_open_base.push(succ_state,sbpl::motion::BASE);
-                    SMPL_DEBUG_STREAM("State "<<succ_state->state_id<< " has never been expanded, added to base open list!");
+
+
+                if (succ_state->iteration_closed[sbpl::motion::ARM] != m_iteration) {
+                    succ_state->f[1] = computeKey(succ_state,sbpl::motion::ARM);
+                    SMPL_DEBUG_STREAM("State "<<succ_state->state_id<< " has arm f-val "<<succ_state->f[1]);
+                    
+                    if (m_open_arm.contains(succ_state,sbpl::motion::ARM)) {
+                       SMPL_DEBUG_STREAM("State "<<succ_state->state_id<< " has already been expanded in arm decrease priority!");
+                        m_open_arm.decrease(succ_state,sbpl::motion::ARM);
+                    }
+                    else {
+                        SMPL_DEBUG_STREAM("State "<<succ_state->state_id<< " has never been expanded, added to arm open list!");
+                        m_open_arm.push(succ_state,sbpl::motion::ARM);
+                    }
+                } else if (!succ_state->incons) {
+                    m_incons.push_back(succ_state);
                 }
-            } else if (!succ_state->incons) {
-                m_incons.push_back(succ_state);
+
             }
+        }
+    }
 
-            if (succ_state->iteration_closed[sbpl::motion::ARM] != m_iteration) {
-                succ_state->f[1] = computeKey(succ_state,sbpl::motion::ARM);
-                SMPL_DEBUG_STREAM("State "<<succ_state->state_id<< " has arm f-val "<<succ_state->f[1]);
-                
-                if (m_open_arm.contains(succ_state,sbpl::motion::ARM)) {
-                   SMPL_DEBUG_STREAM("State "<<succ_state->state_id<< " has already been expanded in arm decrease priority!");
-                    m_open_arm.decrease(succ_state,sbpl::motion::ARM);
+    else
+    {
+        m_space->GetSuccsByGroup(s->state_id, &m_succs, &m_costs, group); 
+        
+     
+        SMPL_DEBUG_STREAM("group "<<group<<" has "<<m_succs.size()<<" successors");
+        
+        for (size_t sidx = 0; sidx < m_succs.size(); ++sidx) {
+            int succ_state_id = m_succs[sidx];
+            int cost = m_costs[sidx];
+
+            SearchState* succ_state = getSearchState(succ_state_id);
+            reinitSearchState(succ_state);
+
+            int new_cost = s->eg + cost;
+            SMPL_DEBUG_NAMED(SELOG, "Compare new cost %d vs old cost %d", new_cost, succ_state->g);
+            if (new_cost < succ_state->g) {
+                succ_state->g = new_cost;
+                succ_state->bp = s;
+
+                if (succ_state->iteration_closed[sbpl::motion::BASE] != m_iteration) {
+                    succ_state->f[0] = computeKey(succ_state,sbpl::motion::BASE);
+                    
+                    SMPL_DEBUG_STREAM("State "<<succ_state->state_id<< " has base f-val "<<succ_state->f[0]);
+                    if (m_open_base.contains(succ_state,sbpl::motion::BASE)) {
+                        SMPL_DEBUG_STREAM("State "<<succ_state->state_id<< " has already been expanded in base decrease priority!");
+                        m_open_base.decrease(succ_state,sbpl::motion::BASE);
+                    }
+                    else {
+                        m_open_base.push(succ_state,sbpl::motion::BASE);
+                        SMPL_DEBUG_STREAM("State "<<succ_state->state_id<< " has never been expanded, added to base open list!");
+                    }
+                } else if (!succ_state->incons) {
+                    m_incons.push_back(succ_state);
                 }
-                else {
-                    SMPL_DEBUG_STREAM("State "<<succ_state->state_id<< " has never been expanded, added to arm open list!");
-                    m_open_arm.push(succ_state,sbpl::motion::ARM);
+
+                if (succ_state->iteration_closed[sbpl::motion::ARM] != m_iteration) {
+                    succ_state->f[1] = computeKey(succ_state,sbpl::motion::ARM);
+                    SMPL_DEBUG_STREAM("State "<<succ_state->state_id<< " has arm f-val "<<succ_state->f[1]);
+                    
+                    if (m_open_arm.contains(succ_state,sbpl::motion::ARM)) {
+                       SMPL_DEBUG_STREAM("State "<<succ_state->state_id<< " has already been expanded in arm decrease priority!");
+                        m_open_arm.decrease(succ_state,sbpl::motion::ARM);
+                    }
+                    else {
+                        SMPL_DEBUG_STREAM("State "<<succ_state->state_id<< " has never been expanded, added to arm open list!");
+                        m_open_arm.push(succ_state,sbpl::motion::ARM);
+                    }
+                } else if (!succ_state->incons) {
+                    m_incons.push_back(succ_state);
                 }
-            } else if (!succ_state->incons) {
-                m_incons.push_back(succ_state);
+
             }
-
         }
     }
 
@@ -690,6 +837,10 @@ void MARAStar::expand(SearchState* s, sbpl::motion::GroupType group)
 // Recompute the f-values of all states in OPEN and reorder OPEN.
 void MARAStar::reorderOpen()
 {
+    ROS_DEBUG_STREAM("reorderOpen called!");
+    
+     m_open_base_iso.make(sbpl::motion::GroupType::BASE_ISO);
+
     for (auto it = m_open_base.begin(); it != m_open_base.end(); ++it) {
         (*it)->f[0] = computeKey(*it, sbpl::motion::BASE);
     }
@@ -704,16 +855,7 @@ void MARAStar::reorderOpen()
 
 int MARAStar::computeKey(SearchState* s,sbpl::motion::GroupType group)
 {
-   if(group == sbpl::motion::GroupType::ARM)
-   {
-        //SMPL_ERROR_STREAM("ARM Compute Key g is "<<s->g<<" and h is "<<s->h[group]);
-        return s->g + (unsigned int)(m_curr_eps * s->h[1]);
-   }
-    else
-    {
-        //SMPL_ERROR_STREAM("AUV "<<base_heur<<" Compute Key g is "<<s->g<<" and h is "<<s->h[base_heur]);
-        return s->g + (unsigned int)(m_curr_eps * s->h[0]);
-    }
+    return s->g + (unsigned int)(m_curr_eps * s->h[group]);
 }
 
 // Get the search state corresponding to a graph state, creating a new state if
@@ -767,7 +909,7 @@ void MARAStar::reinitSearchState(SearchState* state)
         state->call_number = m_call_number;
         state->bp = nullptr;
         state->incons = false;
-        SMPL_DEBUG_STREAM("Base heuristic is "<<state->h[0]<<" arm heuristic is "<<state->h[1]);
+        SMPL_DEBUG_STREAM("Reinit State "<<state->state_id<<": Base heuristic is "<<state->h[0]<<" arm heuristic is "<<state->h[1]);
     }
 }
 

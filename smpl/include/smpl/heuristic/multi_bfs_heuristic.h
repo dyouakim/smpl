@@ -13,6 +13,7 @@
 #include <tf/transform_listener.h>
 
 #include <tf_conversions/tf_eigen.h>
+#include <smpl/debug/visualize.h>
 
 namespace sbpl {
 namespace motion {

@@ -17,7 +17,7 @@ struct multi_index_heap_element
         
         
 private:
-    std::size_t m_heap_index[2];
+    std::size_t m_heap_index[3];
 
     template <class T, class Compare>
     friend class multi_index_intrusive_heap;

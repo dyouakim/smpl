@@ -66,11 +66,11 @@ public:
     //         otherwise
     bool escapeCell(int x, int y, int z);
 
-    void run(int x, int y, int z);
+    int run(int x, int y, int z);
 
     /// \brief Run the BFS starting from a variable number of cells
     template <typename InputIt>
-    void run(InputIt cells_begin, InputIt cells_end);
+    int run(InputIt cells_begin, InputIt cells_end);
 
     void run_components(int gx, int gy, int gz);
 
@@ -155,10 +155,11 @@ inline bool BFS_3D::inBounds(int x, int y, int z) const
 }
 
 template <typename InputIt>
-void BFS_3D::run(InputIt cells_begin, InputIt cells_end)
+int BFS_3D::run(InputIt cells_begin, InputIt cells_end)
 {
+    int numGoals = 0;
     if (m_running) {
-        return;
+        return 0;
     }
 
     for (int i = 0; i < m_dim_xyz; i++) {
@@ -176,13 +177,18 @@ void BFS_3D::run(InputIt cells_begin, InputIt cells_end)
     for (auto it = cells_begin; it != cells_end; ++it) {
         if (ind == 3) {
             const int origin = getNode(xyz[0], xyz[1], xyz[2]);
-            SMPL_ERROR_STREAM("The computed origin is "<<origin);
-            m_queue[start_count++] = origin;
-            m_distance_grid[origin] = 0;
+            if(origin!=-1)
+            {
+                numGoals++;
+                m_queue[start_count++] = origin;
+                m_distance_grid[origin] = 0;
+            }
             ind = 0;
+            it--;
         }
         else {
             xyz[ind++] = *it;
+            //SMPL_ERROR_STREAM("Value added at "<<ind-1<<" is "<<xyz[ind-1]<<" vs "<<(*it));
         }
     }
 
@@ -201,6 +207,7 @@ void BFS_3D::run(InputIt cells_begin, InputIt cells_end)
             std::ref(m_queue_tail));
 
     m_running = true;
+    return numGoals;
 }
 
 inline int BFS_3D::getNode(int x, int y, int z) const

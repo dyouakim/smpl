@@ -65,7 +65,7 @@ class PlanningParams
 {
 public:
 
-    static const int DefaultCostPerCell = 100;
+    static const int DefaultCostPerCell = 250;
 
     // heuristic parameters
     static constexpr double DefaultPlanningLinkSphereRadius = 0.08;

@@ -65,6 +65,7 @@ struct ManipLatticeState
 {
     RobotCoord coord;   // discrete coordinate
     RobotState state;   // corresponding continuous coordinate
+    int source;
 };
 
 inline
@@ -224,6 +225,9 @@ protected:
         -> std::vector<visual::Marker>;
 
     auto getStateVisualizationByGroup(const RobotState& vars, const std::string& ns, int group)
+        -> std::vector<visual::Marker>;
+
+    auto makePathVisualization(const std::vector<RobotState>& path, std::vector<int> sourceGroup) 
         -> std::vector<visual::Marker>;
 
 private:

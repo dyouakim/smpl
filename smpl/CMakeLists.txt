@@ -19,7 +19,8 @@ set(sbpl_LIBRARIES ${SBPL_LIBRARIES})
 if(SMPL_ROS_BUILD)
     find_package(catkin REQUIRED COMPONENTS roscpp visualization_msgs 
   tf
-  tf_conversions)
+  tf_conversions
+)
 
     catkin_package(
         INCLUDE_DIRS
@@ -68,23 +69,23 @@ include_directories(${CMAKE_CURRENT_BINARY_DIR}/include/smpl)
 
 add_library(
     smpl
+src/distance_map/chessboard_distance_map.cpp
+    src/distance_map/distance_map_common.cpp
+    src/distance_map/edge_euclid_distance_map.cpp
+    src/distance_map/euclid_distance_map.cpp
+    src/distance_map/sparse_distance_map.cpp  
+    src/occupancy_grid.cpp
+    src/debug/colors.cpp
+    src/debug/marker_utils.cpp
+    src/debug/visualize.cpp
     src/bfs3d.cpp
     src/csv_parser.cpp
     src/collision_checker.cpp
     src/console/ansi.cpp
     src/console/console.cpp
-    src/occupancy_grid.cpp
     src/planning_params.cpp
     src/post_processing.cpp
     src/robot_model.cpp
-    src/debug/colors.cpp
-    src/debug/marker_utils.cpp
-    src/debug/visualize.cpp
-    src/distance_map/chessboard_distance_map.cpp
-    src/distance_map/distance_map_common.cpp
-    src/distance_map/edge_euclid_distance_map.cpp
-    src/distance_map/euclid_distance_map.cpp
-    src/distance_map/sparse_distance_map.cpp
     src/geometry/bounding_spheres.cpp
     src/geometry/mesh_utils.cpp
     src/geometry/voxelize.cpp

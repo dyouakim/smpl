@@ -162,7 +162,8 @@ enum GroupType
     FAILURE = -2,
     ANY = -1, 
     BASE = 0,
-    ARM = 1
+    ARM = 1,
+    BASE_ISO = 2
 } ;
 
 enum BaseGroupHeuristic
