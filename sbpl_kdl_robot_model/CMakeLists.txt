@@ -38,11 +38,11 @@ target_link_libraries(
     ${catkin_LIBRARIES}
     ${orocos_kdl_LIBRARIES})
 
-add_executable(test_kdl src/test_kdl_robot_model.cpp)
-target_link_libraries(test_kdl ${catkin_LIBRARIES} sbpl_kdl_robot_model)
+#add_executable(test_kdl src/test_kdl_robot_model.cpp)
+#target_link_libraries(test_kdl ${catkin_LIBRARIES} sbpl_kdl_robot_model)
 
 install(
-    TARGETS sbpl_kdl_robot_model test_kdl
+    TARGETS sbpl_kdl_robot_model #test_kdl
     ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
     LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
     RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})
