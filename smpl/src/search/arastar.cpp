@@ -176,14 +176,17 @@ int ARAStar::replan(
             m_curr_eps -= m_delta_eps;
             m_curr_eps = std::max(m_curr_eps, m_final_eps);
             for (SearchState* s : m_incons) {
+                SMPL_WARN("pushing incons state!");
                 s->incons = false;
                 m_open.push(s);
             }
             reorderOpen();
             m_incons.clear();
-            SMPL_DEBUG_NAMED(SLOG, "Begin new search iteration %d with epsilon = %0.3f", m_iteration, m_curr_eps);
+            SMPL_WARN_NAMED(SLOG, "Begin new search iteration %d with epsilon = %0.3f", m_iteration, m_curr_eps);
         }
         err = improvePath(start_time, goal_state, num_expansions, elapsed_time);
+
+         SMPL_DEBUG_STREAM("improve returned with result "<<err<<" and satsfied "<<m_satisfied_eps<<",current "<<m_curr_eps);
         if (m_curr_eps == m_initial_eps) {
             m_expand_count_init += num_expansions;
             m_search_time_init += elapsed_time;
@@ -258,7 +261,6 @@ int ARAStar::replan(
         tparams.max_allowed_time_init = to_duration(allowed_time);
         // note: retain original allowed improvement time
     }
-    
     return replan(tparams, solution, cost);
 }
 
@@ -465,6 +467,7 @@ bool ARAStar::timedOut(
             return elapsed_expansions >= m_time_params.max_expansions;
         }
     case TimeParameters::TIME:
+
         if (m_satisfied_eps == std::numeric_limits<double>::infinity()) {
             return elapsed_time >= m_time_params.max_allowed_time_init;
         } else {
@@ -495,6 +498,7 @@ int ARAStar::improvePath(
         // path to goal found
         if (min_state->f >= goal_state->f || min_state == goal_state) {
             SMPL_DEBUG_NAMED(SLOG, "Found path to goal");
+            SMPL_DEBUG_STREAM("found path and first "<<(min_state->f >= goal_state->f)<<",second "<<(min_state == goal_state));
             return SUCCESS;
         }
 
@@ -504,7 +508,8 @@ int ARAStar::improvePath(
         }
 
         SMPL_DEBUG_NAMED(SELOG, "Expand state %d", min_state->state_id);
-
+        SMPL_DEBUG_STREAM("Min state "<<min_state->state_id<<" and f-val "<<min_state->f);
+                
         m_open.pop();
 
         assert(min_state->iteration_closed != m_iteration);
@@ -543,12 +548,17 @@ void ARAStar::expand(SearchState* s)
         if (new_cost < succ_state->g) {
             succ_state->g = new_cost;
             succ_state->bp = s;
+            SMPL_DEBUG_STREAM("State "<<succ_state->state_id<< " has  f-val "<<succ_state->f);
+                
             if (succ_state->iteration_closed != m_iteration) {
                 succ_state->f = computeKey(succ_state);
                 if (m_open.contains(succ_state)) {
+                    SMPL_DEBUG_STREAM("State "<<succ_state->state_id<< " has already been expanded in  decrease priority!");
                     m_open.decrease(succ_state);
                 } else {
                     m_open.push(succ_state);
+                    SMPL_DEBUG_STREAM("State "<<succ_state->state_id<< " has never been expanded, added to  open list!");
+                
                 }
             } else if (!succ_state->incons) {
                 m_incons.push_back(succ_state);
@@ -612,6 +622,7 @@ void ARAStar::reinitSearchState(SearchState* state)
         state->call_number = m_call_number;
         state->bp = nullptr;
         state->incons = false;
+        SMPL_DEBUG_STREAM("Reinit State "<<state->state_id<<": heuristic is "<<state->h);
     }
 }
 
