@@ -42,6 +42,8 @@
 #include <Eigen/Dense>
 #include <Eigen/StdVector>
 
+#include <map>
+
 // project includes
 #include <smpl/forward.h>
 #include <smpl/debug/marker.h>
@@ -101,6 +103,11 @@ public:
 
     const std::string& getReferenceFrame() const;
     void setReferenceFrame(const std::string& frame);
+    void markCellExpansionStep(double x, double y, double z, int expansion_step);
+    void resetCellsMarking(int restore_step);
+    std::map<std::vector<int>,int> getAddedCells();
+    std::map<std::vector<int>,int> getRemovedCells();
+
     ///@}
 
     /// \name Obstacle Lookups
@@ -274,6 +281,26 @@ inline
 int OccupancyGrid::getCellCount() const
 {
     return m_grid->numCellsX() * m_grid->numCellsY() * m_grid->numCellsZ();
+}
+
+inline void OccupancyGrid::markCellExpansionStep(double x, double y, double z, int expansion_step)  
+{
+    m_grid->markCellExpansionStep(x,y,z,expansion_step);
+}
+
+inline void OccupancyGrid::resetCellsMarking(int restore_step)
+{
+    m_grid->resetCellsMarking(restore_step);
+}
+
+inline std::map<std::vector<int>,int> OccupancyGrid::getAddedCells()
+{
+    return m_grid->getAddedCells();
+}
+
+inline std::map<std::vector<int>,int> OccupancyGrid::getRemovedCells()
+{
+    return m_grid->getRemovedCells();
 }
 
 } // namespace sbpl

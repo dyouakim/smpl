@@ -203,4 +203,24 @@ EigenSTL::vector_Vector3d PropagationDistanceField::toAlignedVector(
     return vout;
 }
 
+void PropagationDistanceField::markCellExpansionStep (double x, double y, double z, int expansion_step)
+{
+    m_df.markCellExpansionStep(x,y,z,expansion_step);
+}
+
+void PropagationDistanceField::resetCellsMarking (int restore_step)
+{
+  m_df.resetCellsMarking(restore_step);
+}
+
+std::map<std::vector<int>,int> PropagationDistanceField::getAddedCells()
+{
+    return m_df.getAddedCells();
+}
+
+std::map<std::vector<int>,int> PropagationDistanceField::getRemovedCells()
+{
+    return m_df.getRemovedCells();
+}
+
 } // namespace sbpl

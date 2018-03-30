@@ -95,6 +95,14 @@ public:
         double world_x, double world_y, double world_z,
         int& x, int& y, int& z) const override;
 
+    void markCellExpansionStep (double x, double y, double z, int expansion_step) override;
+
+    std::map<std::vector<int>,int> getAddedCells() override;
+
+    std::map<std::vector<int>,int> getRemovedCells() override;
+
+    void resetCellsMarking(int restore_step) override;
+
 private:
 
     distance_field::PropagationDistanceField m_df;

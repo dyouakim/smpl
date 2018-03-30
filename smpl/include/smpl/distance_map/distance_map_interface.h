@@ -34,11 +34,10 @@
 
 // standard includes
 #include <vector>
-
+#include <map>
 // system includes
 #include <Eigen/Dense>
 #include <Eigen/StdVector>
-
 // project includes
 #include <smpl/forward.h>
 
@@ -129,7 +128,16 @@ public:
         int& x, int& y, int& z) const = 0;
 
     virtual bool isCellValid(int x, int y, int z) const = 0;
+
+    virtual void markCellExpansionStep (double x, double y, double z, int expansion_step) = 0;
+    
+    virtual std::map<std::vector<int>,int> getAddedCells() = 0;
+
+    virtual std::map<std::vector<int>,int> getRemovedCells() = 0;
+
+    virtual void resetCellsMarking(int restore_step) = 0;
     ///@}
+
 
 protected:
 

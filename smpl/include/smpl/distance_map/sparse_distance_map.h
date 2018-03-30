@@ -127,6 +127,25 @@ public:
 
     double resolution() const { return 1.0 / m_inv_res; }
     auto cells() -> SparseGrid<Cell>& { return m_cells; }
+    void markCellExpansionStep (double x, double y, double z, int expansion_step) 
+    {
+
+    }
+
+    std::map<std::vector<int>,int> getAddedCells()
+    {
+
+    }
+
+    std::map<std::vector<int>,int> getRemovedCells()
+    {
+        
+    }
+
+    void resetCellsMarking(int restore_step)
+    {
+        
+    }
 
 public:
 

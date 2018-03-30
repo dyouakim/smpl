@@ -409,10 +409,6 @@ bool VoxelizeOcTree(
     const Eigen::Vector3d& go,
     std::vector<Eigen::Vector3d>& voxels)
 {
-            ROS_WARN("%f, %f, %f, %f", pose(0, 0), pose(0, 1), pose(0, 2), pose(0, 3));
-            ROS_WARN("%f, %f, %f, %f", pose(1, 0), pose(1, 1), pose(1, 2), pose(1, 3));
-            ROS_WARN("%f, %f, %f, %f", pose(2, 0), pose(2, 1), pose(2, 2), pose(2, 3));
-            ROS_WARN("%f, %f, %f, %f", pose(3, 0), pose(3, 1), pose(3, 2), pose(3, 3));
     auto tree = octree.octree;
     for (auto lit = tree->begin_leafs(); lit != tree->end_leafs(); ++lit) {
         if (tree->isNodeOccupied(*lit)) {

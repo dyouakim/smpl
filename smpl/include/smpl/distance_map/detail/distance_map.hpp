@@ -166,8 +166,9 @@ DistanceMap<Derived>::DistanceMap(
     for (int x = 1; x < m_cells.xsize() - 1; ++x) {
     for (int y = 1; y < m_cells.ysize() - 1; ++y) {
     for (int z = 1; z < m_cells.zsize() - 1; ++z) {
-        /*Cell& c = m_cells(x, y, z);
-        resetCell(c);
+        Cell& c = m_cells(x, y, z);
+        c.counter = -1;
+        /*resetCell(c);
         c.x = x;
         c.y = y;
         c.z = z;*/
@@ -641,6 +642,44 @@ void DistanceMap<Derived>::lower(Cell* s)
         }
     }
 }
+
+template <typename Derived>
+void DistanceMap<Derived>::markCellExpansionStep (double x, double y, double z, int expansion_step)
+{
+    SMPL_ERROR("hereeee marking");
+    int gx,gy,gz;
+    worldToGrid(x,y,z,gx,gy,gz);
+    Cell& c = m_cells(gx, gy, gz);
+    if(c.counter==INT_MAX)
+     c.counter = expansion_step;   
+}
+
+template <typename Derived>
+void DistanceMap<Derived>::resetCellsMarking(int restore_step)
+{
+    SMPL_ERROR("Reset Cells Marking");
+    for (size_t x = 1; x < m_cells.xsize() - 1; ++x) 
+    for (size_t y = 1; y < m_cells.ysize() - 1; ++y) 
+    for (size_t z = 1; z < m_cells.zsize() - 1; ++z) {
+        Cell& c = m_cells(x, y, z);
+        if(c.counter>restore_step)
+            c.counter = INT_MAX; 
+    }
+}
+
+template <typename Derived>
+std::map<std::vector<int>,int> DistanceMap<Derived>::getAddedCells()
+{
+    SMPL_WARN("getAddedCells in distance_map not implemented!");
+}
+
+
+template <typename Derived>
+std::map<std::vector<int>,int> DistanceMap<Derived>::getRemovedCells()
+{
+    SMPL_WARN("getRemovedCells in distance_map not implemented!");
+}
+
 
 template <typename Derived>
 void DistanceMap<Derived>::raise(Cell* s)

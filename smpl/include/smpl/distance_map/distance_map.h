@@ -191,6 +191,13 @@ private:
     void propagateBorder();
 
     void resetCell(Cell& c) const;
+
+    virtual void markCellExpansionStep (double x, double y, double z, int expansion_step) override;
+    virtual void resetCellsMarking(int restore_step) override;
+
+    virtual std::map<std::vector<int>,int> getAddedCells() override;
+
+    virtual std::map<std::vector<int>,int> getRemovedCells() override;
 };
 
 } // namespace sbpl

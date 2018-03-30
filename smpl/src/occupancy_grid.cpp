@@ -39,7 +39,7 @@
 #include <smpl/debug/marker_utils.h>
 #include <smpl/debug/colors.h>
 #include <smpl/distance_map/euclid_distance_map.h>
-
+#include <console_bridge/console.h>
 namespace sbpl {
 
 /// \class OccupancyGrid
@@ -114,6 +114,7 @@ OccupancyGrid::OccupancyGrid(
     const DistanceMapInterfacePtr& df,
     bool ref_counted)
 :
+
     m_grid(df),
     reference_frame_(),
     m_ref_counted(ref_counted),
@@ -127,13 +128,15 @@ OccupancyGrid::OccupancyGrid(
 /// Copy constructor. Constructs the Occupancy Grid with a deep copy of the
 /// contents of \p o.
 OccupancyGrid::OccupancyGrid(const OccupancyGrid& o) :
-    m_grid(o.m_grid->clone()),
+    m_grid(o.m_grid),
     reference_frame_(o.reference_frame_),
     m_ref_counted(o.m_ref_counted),
     m_x_stride(o.m_x_stride),
     m_y_stride(o.m_y_stride),
     m_counts(o.m_counts)
 {
+    //logError("in cloning %zu,%zu",getAddedCells().size(),getRemovedCells().size());
+    
 }
 
 OccupancyGrid& OccupancyGrid::operator=(const OccupancyGrid& rhs)
