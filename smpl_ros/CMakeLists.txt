@@ -20,6 +20,7 @@ find_package(
         leatherman
         moveit_core
         moveit_msgs
+	moveit_ros_planning
         roscpp
         smpl
         trajectory_msgs
@@ -34,6 +35,7 @@ catkin_package(
         leatherman
         moveit_core
         moveit_msgs
+	moveit_ros_planning
         roscpp
         smpl
         trajectory_msgs
