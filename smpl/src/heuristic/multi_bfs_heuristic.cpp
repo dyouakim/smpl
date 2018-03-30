@@ -109,7 +109,7 @@ void MultiBfsHeuristic::updateGoal(const GoalConstraint& goal)
     color.r = 238.0f / 255.0f;
     color.g = 100.0f / 255.0f;
     color.b = 149.0f / 255.0f;
-    color.a = 1.0f;
+    color.a = 0.2f;
     
     SV_SHOW_INFO (visual::MakeCubesMarker(
             centers,
@@ -310,7 +310,7 @@ auto MultiBfsHeuristic::getValuesVisualization() -> visual::Marker
         return visual::MakeEmptyMarker();
     }
 
-    if (m_bfs[GroupType::BASE]->isWall(m_goal_x, m_goal_y, m_goal_z)) {
+    if (m_bfs[GroupType::ARM]->isWall(m_goal_x, m_goal_y, m_goal_z)) {
         return visual::MakeEmptyMarker();
     }
 
@@ -382,7 +382,7 @@ auto MultiBfsHeuristic::getValuesVisualization() -> visual::Marker
 
 //        visited(c.x, c.y, c.z) = true;
 
-        const int d = m_cost_per_cell * m_bfs[GroupType::BASE]->getDistance(c.x, c.y, c.z);
+        const int d = m_cost_per_cell * m_bfs[GroupType::ARM]->getDistance(c.x, c.y, c.z);
 
         for (int dx = -1; dx <= 1; ++dx) {
         for (int dy = -1; dy <= 1; ++dy) {
@@ -396,7 +396,7 @@ auto MultiBfsHeuristic::getValuesVisualization() -> visual::Marker
             int sz = c.z + dz;
 
             // check if neighbor is valid
-            if (!m_bfs[GroupType::BASE]->inBounds(sx, sy, sz) || m_bfs[GroupType::BASE]->isWall(sx, sy, sz)) {
+            if (!m_bfs[GroupType::ARM]->inBounds(sx, sy, sz) || m_bfs[GroupType::ARM]->isWall(sx, sy, sz)) {
                 continue;
             }
 
@@ -407,7 +407,7 @@ auto MultiBfsHeuristic::getValuesVisualization() -> visual::Marker
 
             visited(sx, sy, sz) = true;
 
-            int dd = m_cost_per_cell * m_bfs[GroupType::BASE]->getDistance(sx, sy, sz);
+            int dd = m_cost_per_cell * m_bfs[GroupType::ARM]->getDistance(sx, sy, sz);
             cells.push({sx, sy, sz, dd});
         }
         }
