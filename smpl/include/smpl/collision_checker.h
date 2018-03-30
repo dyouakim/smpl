@@ -61,6 +61,8 @@ public:
     /// \return Whether the state is valid
     virtual bool isStateValid(const RobotState& state, bool verbose = false) = 0;
 
+    virtual bool isStateValid(const RobotState& state, int expansion_step, bool verbose = false) = 0;
+
     /// \brief Return whether the interpolated path between two points is valid.
     ///
     /// Need not include the endpoints.
@@ -95,6 +97,16 @@ public:
     ///@{
     virtual auto getCollisionModelVisualization(const RobotState& state)
         -> std::vector<visual::Marker>;
+
+    virtual void setLastExpansionStep(int step)
+    {
+
+    }
+
+    virtual void resetCellsMarking(int restore_step)
+    {
+
+    }
     ///@}
 };
 

@@ -199,6 +199,11 @@ public:
     ///@{
     bool isStateValid(const motion::RobotState& state, bool verbose = false) override;
 
+    bool isStateValid(const motion::RobotState& state,int expansion_step, bool verbose = false) override
+    {
+
+    }
+
     bool isStateToStateValid(
         const motion::RobotState& start,
         const motion::RobotState& finish,
