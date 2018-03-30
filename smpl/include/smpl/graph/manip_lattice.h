@@ -148,9 +148,11 @@ public:
     /// \name Required Public Functions from RobotPlanningSpace
     ///@{
     bool setStart(const RobotState& state) override;
+    bool setMultipleStart(const std::vector<RobotState>& states) override;
     bool setGoal(const GoalConstraint& goal) override;
     int getStartStateID() const override;
     int getGoalStateID() const override;
+    std::vector<int> getStartStatesID() const override;
     bool extractPath(
         const std::vector<int>& ids,
         std::vector<RobotState>& path)//, std::vector<geometry_msgs::PoseStamped>& eePath) 
@@ -179,6 +181,19 @@ public:
         int state_id,
         std::vector<int>* succs,
         std::vector<int>* costs, int group) override;
+
+    void GetSuccsWithExpansion(
+        int state_id,
+        std::vector<int>* succs,
+        std::vector<int>* costs, int expanion_step) override;
+
+    void GetSuccsByGroupAndExpansion(
+        int state_id,
+        std::vector<int>* succs,
+        std::vector<int>* costs,  int group, int expanion_step) override;
+
+    void GetPredsByGroupAndExpansion(int state_id, std::vector<int>* preds, 
+    std::vector<int>* costs, int group, int expanion_step) override;
 
     sbpl::motion::GroupType switchPlanningGroup(int state_id, double switchThreshold);
 
@@ -230,6 +245,8 @@ protected:
     auto makePathVisualization(const std::vector<RobotState>& path, std::vector<int> sourceGroup) 
         -> std::vector<visual::Marker>;
 
+    
+
 private:
 
     ForwardKinematicsInterface* m_fk_iface = nullptr;
@@ -247,7 +264,8 @@ private:
 
     int m_goal_state_id = -1;
     int m_start_state_id = -1;
-
+    std::vector<int> m_start_states_ids;
+    
     // maps from coords to stateID
     typedef ManipLatticeState StateKey;
     typedef PointerValueHash<StateKey> StateHash;

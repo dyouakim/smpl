@@ -105,6 +105,8 @@ public:
 
     ///@}
 
+    bool applyPredActions(const RobotState& parent, std::vector<Action>& actions, ActionsWeight& weights, int group) ;
+
     /// \name Reimplemented Public Functions from RobotPlanningSpaceObserver
     ///@{
     virtual void updateStart(const RobotState& start) override;
@@ -127,7 +129,7 @@ protected:
     bool applyMotionPrimitive(
         const RobotState& state,
         const MotionPrimitive& mp,
-        Action& action);
+        Action& action, bool isPredecessor);
 
     bool computeIkAction(
         const RobotState& state,
@@ -141,7 +143,7 @@ protected:
         double goal_dist,
         double start_dist,
         const MotionPrimitive& mp,
-        std::vector<Action>& actions);
+        std::vector<Action>& actions, bool isPredecessor);
 
     bool mprimActive(
         double start_dist,

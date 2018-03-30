@@ -61,6 +61,11 @@
 #include <smpl/graph/robot_planning_space.h>
 #include <smpl/heuristic/robot_heuristic.h>
 
+
+#include <moveit/robot_state/conversions.h>
+#include <moveit/robot_model_loader/robot_model_loader.h>
+#include <moveit/planning_pipeline/planning_pipeline.h>
+
 SBPL_CLASS_FORWARD(SBPLPlanner);
 
 namespace sbpl {
@@ -139,6 +144,12 @@ public:
 
     auto makePathVisualization(const std::vector<RobotState>& path) const
         -> std::vector<visual::Marker>;
+
+    void updateGrid(OccupancyGrid* grid)
+    {
+        m_grid = grid;
+        m_grid->setReferenceFrame(m_params.planning_frame);
+    } 
     ///@}
 
 protected:
@@ -166,6 +177,7 @@ protected:
 
     int m_sol_cost;
 
+    int lastPlanRequestId_;
     std::string m_planner_id;
 
     moveit_msgs::MotionPlanRequest m_req;
@@ -181,6 +193,9 @@ protected:
     // Set start configuration
     bool setStart(const moveit_msgs::RobotState& state);
 
+    // Set start configuration
+    bool setMultipleStart(std::vector<moveit_msgs::RobotState>& states);
+
     // Set goal(s)
     bool setGoalPosition(const moveit_msgs::Constraints& goals);
 
@@ -188,10 +203,16 @@ protected:
     bool setGoalConfiguration(const moveit_msgs::Constraints& goal_constraints);
 
     // Plan a path to a cartesian goal(s)
-    bool planToPose(
+    bool planToPose(const moveit_msgs::PlanningScene& scene_msg,
         const moveit_msgs::MotionPlanRequest& req,
         std::vector<RobotState>& path,
         moveit_msgs::MotionPlanResponse& res);
+    
+    bool planToPoseWithMultipleIK(const moveit_msgs::PlanningScene& scene_msg,
+        const moveit_msgs::MotionPlanRequest& req,
+        std::vector<RobotState>& path,
+        moveit_msgs::MotionPlanResponse& res);
+
     bool planToConfiguration(
         const moveit_msgs::MotionPlanRequest& req,
         std::vector<RobotState>& path,
@@ -199,6 +220,9 @@ protected:
 
     // Retrieve plan from sbpl
     bool plan(double allowed_time, std::vector<RobotState>& path);
+
+    // Replan from sbpl --> specially used by TRA*
+    bool replan(double allowed_time, std::vector<RobotState>& path, int restore_step);
 
     bool extractGoalPoseFromGoalConstraints(
         const moveit_msgs::Constraints& goal_constraints,
@@ -234,6 +258,9 @@ protected:
     bool writePath(
         const moveit_msgs::RobotState& ref,
         const moveit_msgs::RobotTrajectory& traj) const;
+
+    void resetCellsMarking(int restore_step);
+
 };
 
 } // namespace motion

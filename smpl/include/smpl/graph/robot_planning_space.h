@@ -68,10 +68,16 @@ public:
         const PlanningParams* params);
 
     virtual bool setStart(const RobotState& state);
+    virtual bool setMultipleStart(const std::vector<RobotState>& states);
+
     virtual bool setGoal(const GoalConstraint& goal);
 
     virtual int getStartStateID() const = 0;
     virtual int getGoalStateID() const = 0;
+    virtual std::vector<int> getStartStatesID() const
+    {
+
+    }
 
     virtual bool extractPath(
         const std::vector<int>& ids,
@@ -130,6 +136,19 @@ public:
         std::vector<int>* succs,
         std::vector<int>* costs, int group) override;
 
+    virtual void GetSuccsByGroupAndExpansion(
+        int state_id,
+        std::vector<int>* succs,
+        std::vector<int>* costs, int group, int expanion_step) override;
+
+    virtual void GetSuccsWithExpansion(
+        int state_id,
+        std::vector<int>* succs,
+        std::vector<int>* costs, int expanion_step) override;
+
+    virtual void GetPredsByGroupAndExpansion(int TargetStateID, std::vector<int>* PredIDV, 
+        std::vector<int>* CostV, int group, int expanion_step) override;
+
     virtual void GetPreds(
         int state_id,
         std::vector<int>* preds,
@@ -139,6 +158,7 @@ public:
         int state_id,
         bool verbose,
         FILE* f = nullptr) override = 0;
+
     ///@}
 
     //virtual void getExpandedStates(std::vector<RobotState>& states) const  = 0;

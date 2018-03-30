@@ -85,6 +85,12 @@ bool RobotPlanningSpace::hasHeuristic(const RobotHeuristic* h)
     return hit != m_heuristics.end();
 }
 
+bool RobotPlanningSpace::setMultipleStart(const std::vector<RobotState>& states)
+{
+    SMPL_WARN("setMultipleStart not implemented!");
+}
+
+
 bool RobotPlanningSpace::setStart(const RobotState& start)
 {
     m_start = start;
@@ -186,12 +192,35 @@ int RobotPlanningSpace::GetTrueCost(int parent_id, int child_id)
 
     return costs[std::distance(succs.begin(), sit)];
 }
+
+void RobotPlanningSpace::GetSuccsWithExpansion(
+        int state_id,
+        std::vector<int>* succs,
+        std::vector<int>* costs, int expanion_step)
+{
+
+}
+
 void RobotPlanningSpace::GetSuccsByGroup(
         int state_id,
         std::vector<int>* succs,
         std::vector<int>* costs, int group)
 {
     
+}
+
+void RobotPlanningSpace::GetSuccsByGroupAndExpansion(
+        int state_id,
+        std::vector<int>* succs,
+        std::vector<int>* costs, int group, int expanion_step)
+{
+    
+}
+
+void RobotPlanningSpace::GetPredsByGroupAndExpansion(int TargetStateID, std::vector<int>* PredIDV, 
+    std::vector<int>* CostV, int group, int expanion_step)
+{
+
 }
 
 } // namespace motion
