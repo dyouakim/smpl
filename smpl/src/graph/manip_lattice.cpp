@@ -361,7 +361,7 @@ void ManipLattice::GetSuccsWithExpansion(
         if (is_goal_succ) {
             // update goal state
             SMPL_DEBUG("increasing goal succ!");
-            SMPL_INFO_STREAM("state_id "<<succ_state_id<<" and goal "<<m_goal_state_id);
+            SMPL_DEBUG_STREAM("state_id "<<succ_state_id<<" and goal "<<m_goal_state_id);
             ++goal_succ_count;
         }
 
@@ -376,12 +376,12 @@ void ManipLattice::GetSuccsWithExpansion(
         // log successor details
         if(is_goal_succ)
         {
-            SMPL_INFO_NAMED(params()->expands_log, "      succ: %zu", i);
-            SMPL_INFO_NAMED(params()->expands_log, "        id: %5i", succ_state_id);
-            SMPL_INFO_STREAM_NAMED(params()->expands_log, "        coord: " << succ_coord);
-            SMPL_INFO_STREAM_NAMED(params()->expands_log, "        state: " << succ_entry->state);
-            //SMPL_INFO_NAMED(params()->expands_log, "        heur: %2d", GetGoalHeuristic(succ_state_id));
-            SMPL_INFO_NAMED(params()->expands_log, "        cost: %5d", cost(parent_entry, succ_entry, is_goal_succ));
+            SMPL_DEBUG_NAMED(params()->expands_log, "      succ: %zu", i);
+            SMPL_DEBUG_NAMED(params()->expands_log, "        id: %5i", succ_state_id);
+            SMPL_DEBUG_STREAM_NAMED(params()->expands_log, "        coord: " << succ_coord);
+            SMPL_DEBUG_STREAM_NAMED(params()->expands_log, "        state: " << succ_entry->state);
+            //SMPL_DEBUG_NAMED(params()->expands_log, "        heur: %2d", GetGoalHeuristic(succ_state_id));
+            SMPL_DEBUG_NAMED(params()->expands_log, "        cost: %5d", cost(parent_entry, succ_entry, is_goal_succ));
         }
     }
 
@@ -602,7 +602,10 @@ void ManipLattice::GetPredsByGroupAndExpansion(int state_id, std::vector<int>* p
     SMPL_DEBUG_NAMED(params()->expands_log, "  heur: %d", GetGoalHeuristic(state_id));
 
     auto* vis_name = "expansion";
-    SV_SHOW_INFO_NAMED(vis_name, getStateVisualizationByGroup(parent_entry->state, vis_name, group));
+    if(group==-1)
+        SV_SHOW_INFO_NAMED(vis_name, getStateVisualization(parent_entry->state, vis_name));
+    else
+        SV_SHOW_INFO_NAMED(vis_name, getStateVisualizationByGroup(parent_entry->state, vis_name, group));
 
     int goal_succ_count = 0;
 
@@ -611,7 +614,7 @@ void ManipLattice::GetPredsByGroupAndExpansion(int state_id, std::vector<int>* p
     std::vector<Action> actions;
     ActionsWeight weights;
     if (!m_actions->applyPredActions(parent_entry->state, actions, weights, group)) {
-        SMPL_DEBUG("Failed to get actions");
+        SMPL_ERROR("Failed to get actions");
         return;
     }
 
@@ -636,7 +639,8 @@ void ManipLattice::GetPredsByGroupAndExpansion(int state_id, std::vector<int>* p
         // check if hash entry already exists, if not then create one
         int pred_state_id = getOrCreateState(pred_coord, action.back());
         ManipLatticeState* pred_entry = getHashEntry(pred_state_id);
-        pred_entry->source = group;
+        if(group!=-1)
+            pred_entry->source = group;
 
         // check if this state meets the goal criteria
         const bool is_goal_succ = isGoal(action.back());
@@ -653,8 +657,8 @@ void ManipLattice::GetPredsByGroupAndExpansion(int state_id, std::vector<int>* p
         }
         costs->push_back(cost(parent_entry, pred_entry, weights[i], is_goal_succ));
 
-        // log successor details
-        SMPL_DEBUG_NAMED(params()->expands_log, "      succ: %zu", i);
+        // log predecessor details
+        SMPL_DEBUG_NAMED(params()->expands_log, "      pred: %zu", i);
         SMPL_DEBUG_NAMED(params()->expands_log, "        id: %5i", pred_state_id);
         SMPL_DEBUG_STREAM_NAMED(params()->expands_log, "        coord: " << pred_coord);
         SMPL_DEBUG_STREAM_NAMED(params()->expands_log, "        state: " << pred_entry->state);
@@ -1074,7 +1078,7 @@ int ManipLattice::cost(
 {
     const int DefaultCostMultiplier = 1000;
     
-    int dx = HashEntry1->coord[0] - HashEntry2->coord[0];
+    /*int dx = HashEntry1->coord[0] - HashEntry2->coord[0];
     int dy = HashEntry1->coord[1] - HashEntry2->coord[1];
     double yaw = HashEntry1->coord[3];
     double heading = std::atan2(dy, dx);
@@ -1083,7 +1087,7 @@ int ManipLattice::cost(
     if (sideways) {
         int penalty = 2;
         return DefaultCostMultiplier * penalty;
-    }
+    }*/
     return DefaultCostMultiplier*actionWeight;
 }
 
@@ -1097,9 +1101,9 @@ bool ManipLattice::checkAction(const RobotState& state, const Action& action)
         //SMPL_DEBUG_STREAM_NAMED(params()->expands_log, "        " << iidx << ": " << istate);
 
         if (!robot()->checkJointLimits(istate)) {
-            SMPL_INFO_STREAM_NAMED(params()->expands_log, "        " << iidx << ": " << istate);
+            SMPL_DEBUG_STREAM_NAMED(params()->expands_log, "        " << iidx << ": " << istate);
 
-            SMPL_INFO_NAMED(params()->expands_log, "        -> violates joint limits");
+            SMPL_DEBUG_NAMED(params()->expands_log, "        -> violates joint limits");
             violation_mask |= 0x00000001;
             break;
         }
@@ -1126,9 +1130,9 @@ bool ManipLattice::checkAction(const RobotState& state, const Action& action)
 
     // check for collisions along path from parent to first waypoint
     if (!collisionChecker()->isStateToStateValid(state, action[0])) {
-        SMPL_INFO_STREAM_NAMED(params()->expands_log, "        "  << action[0]);
+        SMPL_DEBUG_STREAM_NAMED(params()->expands_log, "        "  << action[0]);
 
-        SMPL_INFO_NAMED(params()->expands_log, "        -> path to first waypoint in collision");
+        SMPL_DEBUG_NAMED(params()->expands_log, "        -> path to first waypoint in collision");
         violation_mask |= 0x00000004;
     }
 
@@ -1201,7 +1205,7 @@ bool ManipLattice::isGoal(const RobotState& state)
                 auto time_to_goal_s =
                         duration_cast<duration<double>>(time_to_goal_region);
                 m_near_goal = true;
-                SMPL_INFO_NAMED(params()->expands_log, "Search is at %0.2f %0.2f %0.2f, within %0.3fm of the goal (%0.2f %0.2f %0.2f) after %0.4f sec.",
+                SMPL_DEBUG_NAMED(params()->expands_log, "Search is at %0.2f %0.2f %0.2f, within %0.3fm of the goal (%0.2f %0.2f %0.2f) after %0.4f sec.",
                         pose[0], pose[1], pose[2],
                         goal().xyz_tolerance[0],
                         goal().tgt_off_pose[0], goal().tgt_off_pose[1], goal().tgt_off_pose[2],
@@ -1221,9 +1225,9 @@ bool ManipLattice::isGoal(const RobotState& state)
 
 //            const double theta = angles::normalize_angle(Eigen::AngleAxisd(qg.conjugate() * q).angle());
             const double theta = angles::normalize_angle(2.0 * acos(q.dot(qg)));
-            SMPL_INFO_STREAM("Theta vs. goal tolerance "<<theta<<","<<goal().rpy_tolerance[0]);
+            SMPL_DEBUG_STREAM("Theta vs. goal tolerance "<<theta<<","<<goal().rpy_tolerance[0]);
             if (theta < goal().rpy_tolerance[0]) {
-                SMPL_INFO("Goal state found");
+                SMPL_DEBUG("Goal state found");
                 return true;
             }
         }
@@ -1436,7 +1440,6 @@ bool ManipLattice::setMultipleStart(const std::vector<RobotState>& states)
 
     m_start_state_id = getOrCreateState(virtual_start_coord, virtual_start_state);
     */
-
     for(int i=0;i<states.size();i++)
     {
         if ((int)states[i].size() < robot()->jointVariableCount()) {
@@ -1467,9 +1470,10 @@ bool ManipLattice::setMultipleStart(const std::vector<RobotState>& states)
         stateToCoord(states[i], start_coord);
         SMPL_DEBUG_STREAM_NAMED(params()->graph_log, "  coord: " << start_coord);
         int start_state_id = getOrCreateState(start_coord, states[i]);
+
         m_start_states_ids.push_back(start_state_id);
 
-        auto markers = collisionChecker()->getCollisionModelVisualization(states[i]);
+       auto markers = collisionChecker()->getCollisionModelVisualization(states[i]);
         for (auto& marker : markers) {
            
             visual::Color color;
@@ -1478,13 +1482,15 @@ bool ManipLattice::setMultipleStart(const std::vector<RobotState>& states)
             color.b=0.5;
             marker.ns = vis_name + std::to_string(i);
             marker.color = color;
-            
+
         }
         SV_SHOW_INFO_NAMED(vis_name + std::to_string(i), markers);
+       
     }
     
     m_start_state_id = m_start_states_ids[0];
-
+    
+    ROS_ERROR_STREAM("Current start ID "<<m_start_state_id);
     // notify observers of updated start state
     return RobotPlanningSpace::setStart(states[0]);
 }
@@ -1530,13 +1536,16 @@ bool ManipLattice::setStart(const RobotState& state)
 
 bool ManipLattice::setGoal(const GoalConstraint& goal)
 {
+
     switch (goal.type) {
     case GoalType::XYZ_GOAL:
     case GoalType::XYZ_RPY_GOAL: {
         return setGoalPose(goal);
     }   break;
     case GoalType::JOINT_STATE_GOAL:
+    {
         return setGoalConfiguration(goal);
+    }
     default:
         return false;
     }
@@ -1770,12 +1779,12 @@ bool ManipLattice::setGoalPose(const GoalConstraint& gc)
     using namespace std::chrono;
     auto now = clock::now();
     auto now_s = duration_cast<duration<double>>(now.time_since_epoch());
-    SMPL_DEBUG_NAMED(params()->graph_log, "time: %f", now_s.count());
-    SMPL_DEBUG_NAMED(params()->graph_log, "A new goal has been set.");
-    SMPL_DEBUG_NAMED(params()->graph_log, "    xyz (meters): (%0.2f, %0.2f, %0.2f)", gc.pose[0], gc.pose[1], gc.pose[2]);
-    SMPL_DEBUG_NAMED(params()->graph_log, "    tol (meters): %0.3f", gc.xyz_tolerance[0]);
-    SMPL_DEBUG_NAMED(params()->graph_log, "    rpy (radians): (%0.2f, %0.2f, %0.2f)", gc.pose[3], gc.pose[4], gc.pose[5]);
-    SMPL_DEBUG_NAMED(params()->graph_log, "    tol (radians): %0.3f", gc.rpy_tolerance[0]);
+    SMPL_ERROR_NAMED(params()->graph_log, "time: %f", now_s.count());
+    SMPL_ERROR_NAMED(params()->graph_log, "A new goal has been set.");
+    SMPL_ERROR_NAMED(params()->graph_log, "    xyz (meters): (%0.2f, %0.2f, %0.2f)", gc.pose[0], gc.pose[1], gc.pose[2]);
+    SMPL_ERROR_NAMED(params()->graph_log, "    tol (meters): %0.3f", gc.xyz_tolerance[0]);
+    SMPL_ERROR_NAMED(params()->graph_log, "    rpy (radians): (%0.2f, %0.2f, %0.2f)", gc.pose[3], gc.pose[4], gc.pose[5]);
+    SMPL_ERROR_NAMED(params()->graph_log, "    tol (radians): %0.3f", gc.rpy_tolerance[0]);
 
     startNewSearch();
     // set the (modified) goal
@@ -1813,6 +1822,7 @@ bool ManipLattice::setGoalConfiguration(const GoalConstraint& goal)
     
 
     SV_SHOW_INFO_NAMED(vis_name, markers);
+
 
     // notify observers of updated goal
     return RobotPlanningSpace::setGoal(goal);

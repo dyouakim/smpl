@@ -500,6 +500,8 @@ bool ManipLatticeActionSpace::applyPredActions(const RobotState& parent, std::ve
     if (actions.empty()) {
         SMPL_WARN_ONCE("No motion primitives specified");
     }
+
+    return true;
 }
 
 bool ManipLatticeActionSpace::getAction(
@@ -512,6 +514,7 @@ bool ManipLatticeActionSpace::getAction(
     if (!mprimActive(start_dist, goal_dist, mp.type)) {
         return false;
     }
+
     GoalType goal_type = planningSpace()->goal().type;
     const std::vector<double>& goal_pose = planningSpace()->goal().pose;
 
