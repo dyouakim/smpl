@@ -1,25 +1,21 @@
-#ifndef SBPL_TRAStar_H
-#define SBPL_TRAStar_H
+#ifndef SBPL_MHTRASTAR_H
+#define SBPL_MHTRASTAR_H
 
 // standard includes
 #include <assert.h>
-#include <stdio.h>
-#include <time.h>
-#include <vector>
-#include <algorithm> 
+#include <algorithm>
 
 // system includes
 #include <sbpl/heuristics/heuristic.h>
 #include <sbpl/planners/planner.h>
-#include <smpl/intrusive_heap.h>
-#include <smpl/time.h>
-#include <smpl/search/arastar.h>
-
-#include <smpl/console/console.h>
 
 // project includes
-//#include <sbpl_adaptive/common.h>
-//#include <sbpl_adaptive/core/search/adaptive_planner.h>
+#include <smpl/multi_index_intrusive_heap.h>
+#include <smpl/time.h>
+#include <smpl/types.h>
+#include <smpl/graph/manip_lattice.h>
+
+#include <smpl/console/console.h>
 
 namespace sbpl {
 // control of EPS
@@ -34,57 +30,69 @@ namespace sbpl {
 #define TRA_INCONS_LIST_ID 0
 #define TRAMDP_STATEID2IND ARAMDP_STATEID2IND
 
-struct TRAState : public heap_element
+
+
+struct MHTRAState : public multi_index_heap_element
 {
     int state_id;       // corresponding graph state
 
     /// \brief TRA* relevant data
     unsigned int E; // expansion time
     unsigned int C; // creation time -- first put on open list
-     std::vector<int> parent_hist; // history of parents
+    std::vector<int> parent_hist; // history of parents
+    int source;
     // history of g-values associated with each of the parents in parent_hist
     std::vector<unsigned int> gval_hist;
 
     unsigned int v;
     unsigned int g;     // cost-to-come
-    unsigned int h;     // estimated cost-to-go
-    unsigned int f;     // (g + eps * h) at time of insertion into OPEN
+    unsigned int h[2];     // estimated cost-to-go
+    unsigned int f[2];     // (g + eps * h) at time of insertion into OPEN
     unsigned int eg;    // g-value at time of expansion
             
-    short unsigned int iteration_closed;
+    unsigned short iteration_closed[2];
     short unsigned int call_number;
     short unsigned int numofexpands;
 
     /// \brief best predecessor and the action from it, used only in forward searches
-    TRAState *bestpredstate;
+    MHTRAState *bestpredstate;
 
     /// \brief the next state if executing best action
-    TRAState  *bestnextstate;
+    MHTRAState  *bestnextstate;
     unsigned int costtobestnextstate;
     bool incons;
 
     unsigned int firstExpansionStep;
-    TRAState() {};
-    ~TRAState() {};
+    std::vector<bool> to_erase_parents;
+    MHTRAState() {};
+    ~MHTRAState() {};
 
     int getSize()
     {
         return (int) (
-                sizeof(TRAState) +
-                sizeof(TRAState*) * parent_hist.size() +    // parent_hist
+                sizeof(MHTRAState) +
+                sizeof(MHTRAState*) * parent_hist.size() +    // parent_hist
                 sizeof(unsigned int) * gval_hist.size() );  // gval_hist
     }
 };
 
-struct SearchStateCompare
+
+struct SearchStateCompareBase
     {
-        bool operator()(const TRAState& s1, const TRAState& s2) const {
-            return s1.f < s2.f;
+        bool operator()(const MHTRAState& s1, const MHTRAState& s2) const {
+            return s1.f[0] < s2.f[0];
+        }
+    };
+
+    struct SearchStateCompareArm
+    {
+        bool operator()(const MHTRAState& s1, const MHTRAState& s2) const {
+            return s1.f[1] < s2.f[1];
         }
     };
 
 
-class TRAStar : public SBPLPlanner
+class MHTRAStar : public SBPLPlanner
 {
 
 public:
@@ -103,9 +111,9 @@ public:
     };
 
 
-    TRAStar(DiscreteSpaceInformation* space, Heuristic* heuristic, bool bForwardSearch);
+    MHTRAStar(DiscreteSpaceInformation* space, Heuristic* heuristic, bool bForwardSearch);
 
-    ~TRAStar();
+    ~MHTRAStar();
 
     void allowPartialSolutions(bool enabled) { m_allow_partial_solutions = enabled; }
     bool allowPartialSolutions() const { return m_allow_partial_solutions; }
@@ -124,8 +132,8 @@ public:
     int replan(double allowed_time_secs, std::vector<int>* solution) override;
     int replan(double allowed_time_secs, std::vector<int>* solution, int* solcost) override;
     int set_goal(int state_id) override;
-    int set_multiple_start(std::vector<int> start_statesID) override;
     int set_start(int state_id) override;
+    int set_multiple_start(std::vector<int> start_statesID) override;
     int force_planning_from_scratch() override;
     int set_search_mode(bool bSearchUntilFirstSolution) override;
     void costs_changed(const StateChangeQuery& stateChange) override;
@@ -169,16 +177,17 @@ public:
 
    void updateSpace(DiscreteSpaceInformation* space)
    {
-     m_space = space;
+        m_space = space;
    }
 
    void initializeStartStates();
-
 private:
 
 
     DiscreteSpaceInformation* m_space;
     Heuristic* m_heur;
+    MHTRAState* start_state;
+    MHTRAState* goal_state;
 
     TimeParameters m_time_params;
 
@@ -197,14 +206,12 @@ private:
     // modes)
     bool bsearchuntilfirstsolution;
 
-    std::vector<TRAState*> m_states;
+    std::vector<MHTRAState*> m_states;
 
-    TRAState* goal_state;
-    TRAState* start_state;
-
-    std::vector<int> m_start_states_ids;
     int m_start_state_id;   // graph state id for the start state
     int m_goal_state_id;    // graph state id for the goal state
+
+    std::vector<int> m_start_states_ids;
 
     // map from graph state id to search state id, incrementally expanded
     // as states are encountered during the search
@@ -212,8 +219,14 @@ private:
 
     // search state (not including the values of g, f, back pointers, and
     // closed list from m_stats)
-    intrusive_heap<TRAState, SearchStateCompare> m_open;
-    std::vector<TRAState*> m_incons;
+    //intrusive_heap<MHTRAState, SearchStateCompare> m_open;
+
+    multi_index_intrusive_heap<MHTRAState, SearchStateCompareBase> m_open_base;
+    multi_index_intrusive_heap<MHTRAState, SearchStateCompareBase> m_open_base_iso;
+    multi_index_intrusive_heap<MHTRAState, SearchStateCompareArm> m_open_arm;
+
+
+    std::vector<MHTRAState*> m_incons;
     double m_curr_eps;
     int m_iteration;
 
@@ -237,7 +250,8 @@ private:
 
     bool bNewSearchIteration;
 
-    std::vector<TRAState*> seen_states;
+    std::vector<MHTRAState*> seen_states;
+
 
     bool costChanged;
     int restore_step;
@@ -247,48 +261,49 @@ private:
 
     bool timedOut(int elapsed_expansions, const clock::duration& elapsed_time) const;
 
-    int improvePath(const clock::time_point& start_time, TRAState* goal_state, int& elapsed_expansions, clock::duration& elapsed_time);
+    int improvePath(const clock::time_point& start_time, MHTRAState* goal_state, int& elapsed_expansions, clock::duration& elapsed_time);
 
-    void expand(TRAState* s);
+    void expand(MHTRAState* s, sbpl::motion::GroupType group);
 
     void recomputeHeuristics();
     void reorderOpen();
-    int computeKey(TRAState* s) const;
+    int computeKey(MHTRAState* s, sbpl::motion::GroupType group) const;
 
-    TRAState* getSearchState(int state_id);
-    TRAState* createState(int state_id);
-    void reinitSearchState(TRAState* state);
+    MHTRAState* getSearchState(int state_id);
+    MHTRAState* createState(int state_id);
+    void reinitSearchState(MHTRAState* state);
 
-    void extractPath(TRAState* to_state, std::vector<int>& solution, int& cost) const;
+    void extractPath(MHTRAState* to_state, std::vector<int>& solution, int& cost) const;
 
     bool RestoreSearchTree(int restoreStep);
+    bool RestorePerGroup(MHTRAState* current, int restoreStep, int group, std::vector<MHTRAState*>& current_seen, bool& addedToSeen);
 
-    bool updateParents(TRAState* state, unsigned int expansionStep, int& latestParenIdx, unsigned int& latestGVal);
+    bool updateParents(MHTRAState* state, unsigned int expansionStep, int& latestParenIdx, unsigned int& latestGVal, int group);
 
-    bool storeParent(TRAState* succ_state, TRAState* state, unsigned int gVal, unsigned int expansionStep);
+    bool storeParent(MHTRAState* succ_state, MHTRAState* state, unsigned int gVal, unsigned int expansionStep);
 
 
     unsigned int GetStateCreationTime(int stateID)
     {
-        TRAState* state = getSearchState(stateID);
+        MHTRAState* state = getSearchState(stateID);
         return state->C;
     };
 
     // initialization of the start state
     void InitializeSearch();
 
-    void Recomputegval(TRAState* state);
+    void Recomputegval(MHTRAState* state);
 
     // used for backward search
-    void UpdatePreds(TRAState* state);
+    void UpdatePreds(MHTRAState* state);
 
     //used for forward search
-    void UpdateSuccs(TRAState* state);
+    void UpdateSuccs(MHTRAState* state);
     
     void BuildNewOPENList();
 
     // debugging
-    void PrintSearchState(TRAState* state, FILE* fOut);
+    void PrintSearchState(MHTRAState* state, FILE* fOut);
 
 };
 

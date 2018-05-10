@@ -75,6 +75,7 @@
 #include <smpl/search/arastar.h>
 #include <smpl/search/trastar.h>
 #include <smpl/search/marastar.h>
+#include <smpl/search/mhtrastar.h>
 #include <smpl/search/experience_graph_planner.h>
 #include <leatherman/binvox.h>
 
@@ -615,6 +616,33 @@ auto MakeTRAStar(RobotPlanningSpace* space, RobotHeuristic* heuristic)
     return std::move(search);
 }
 
+
+auto MakeMHTRAStar(RobotPlanningSpace* space, RobotHeuristic* heuristic)
+    -> std::unique_ptr<SBPLPlanner>
+{
+    const bool forward_search = true;
+    auto search = make_unique<MHTRAStar>(space, heuristic, forward_search);
+
+    double epsilon;
+    space->params()->param("epsilon", epsilon, 1.0);
+    search->set_initialsolution_eps(epsilon);
+
+    bool search_mode;
+    space->params()->param("search_mode", search_mode, false);
+    search->set_search_mode(search_mode);
+
+    bool allow_partial_solutions;
+    if (space->params()->getParam("allow_partial_solutions", allow_partial_solutions)) {
+        search->allowPartialSolutions(allow_partial_solutions);
+    }
+
+    double repair_time;
+    if (space->params()->getParam("repair_time", repair_time)) {
+        search->setAllowedRepairTime(repair_time);
+    }
+    return std::move(search);
+}
+
 auto MakeMARAStar(RobotPlanningSpace* space, RobotHeuristic* heuristic)
     -> std::unique_ptr<SBPLPlanner>
 {
@@ -859,6 +887,7 @@ PlannerInterface::PlannerInterface(
     m_planner_factories["egwastar"] = MakeEGWAStar;
     m_planner_factories["padastar"] = MakePADAStar;
     m_planner_factories["trastar"] = MakeTRAStar;
+    m_planner_factories["mhtrastar"] = MakeMHTRAStar;
     m_planner_factories["marastar"] = MakeMARAStar;
 
     ROS_WARN_STREAM("grid # occupied "<<m_grid->getOccupiedVoxelCount()<< " and frame "<<m_grid->getReferenceFrame());
@@ -1163,7 +1192,7 @@ bool PlannerInterface::setGoalConfiguration(
         sbpl_angle_tolerance[jidx] = std::min(
                 fabs(joint_constraint.tolerance_above),
                 fabs(joint_constraint.tolerance_below));
-        ROS_INFO_NAMED(PI_LOGGER, "Joint %zu [%s]: goal position: %.3f, goal tolerance: %.3f", i, joint_name.c_str(), sbpl_angle_goal[jidx], sbpl_angle_tolerance[jidx]);
+        ROS_DEBUG_NAMED(PI_LOGGER, "Joint %zu [%s]: goal position: %.3f, goal tolerance: %.3f", i, joint_name.c_str(), sbpl_angle_goal[jidx], sbpl_angle_tolerance[jidx]);
     }
 
     GoalConstraint goal;
@@ -1180,6 +1209,8 @@ bool PlannerInterface::setGoalConfiguration(
         goal.tgt_off_pose.resize(6, 0.0);
     }
 
+    ROS_ERROR_STREAM("Setting the planner interface goal "<< goal.pose[0]<<","<<goal.pose[1]<<","<<goal.pose[2]);
+    ROS_ERROR_STREAM("Setting the planner interface goal off pose "<<goal.tgt_off_pose[0]<<","<<goal.tgt_off_pose[1]<<","<<goal.tgt_off_pose[2]);
     // set sbpl environment goal
     if (!m_pspace->setGoal(goal)) {
         ROS_ERROR("Failed to set goal");
@@ -1512,7 +1543,7 @@ bool PlannerInterface::planToPoseWithMultipleIK(const moveit_msgs::PlanningScene
         const moveit::core::JointModelGroup* joint_group = state.getJointModelGroup(req.group_name);
         bool result = true;
         state.setFromIK(joint_group,pose.pose,1,0.05,boost::bind(&isIKSolutionValid,planning_scene.get(), kset.empty() ? NULL : &kset, _1, _2, _3));
-        std::vector<double> position(8,0);
+        /*std::vector<double> position(8,0);
         position[0] = 5.24673;
         position[1] = 0.765405;
         position[2] = 7.24129;
@@ -1539,8 +1570,8 @@ bool PlannerInterface::planToPoseWithMultipleIK(const moveit_msgs::PlanningScene
         else
             ROS_ERROR_STREAM("invalid solution!");
         state.setToRandomPositions(joint_group);
-        //result = state.setFromIK(joint_group,pose.pose,1,0.05,boost::bind(&isIKSolutionValid,planning_scene.get(), kset.empty() ? NULL : &kset, _1, _2, _3));
-        position[0] = 6.90329;
+        result = state.setFromIK(joint_group,pose.pose,1,0.05,boost::bind(&isIKSolutionValid,planning_scene.get(), kset.empty() ? NULL : &kset, _1, _2, _3));
+        /*position[0] = 6.90329;
         position[1] = -0.580802;
         position[2] = 7.24129;
         position[3] = 2.20981;
@@ -1566,8 +1597,8 @@ bool PlannerInterface::planToPoseWithMultipleIK(const moveit_msgs::PlanningScene
         else
             ROS_ERROR_STREAM("invalid solution!");
         state.setToRandomPositions(joint_group);
-        //result = state.setFromIK(joint_group,pose.pose,1,0.05,boost::bind(&isIKSolutionValid,planning_scene.get(), kset.empty() ? NULL : &kset, _1, _2, _3));
-        position[0] = 5.90277;
+        result = state.setFromIK(joint_group,pose.pose,1,0.05,boost::bind(&isIKSolutionValid,planning_scene.get(), kset.empty() ? NULL : &kset, _1, _2, _3));
+        /*position[0] = 5.90277;
         position[1] = -1.06694;
         position[2] = 7.31017;
         position[3] = 1.12096;
@@ -1592,9 +1623,9 @@ bool PlannerInterface::planToPoseWithMultipleIK(const moveit_msgs::PlanningScene
         else
             ROS_ERROR_STREAM("invalid solution!");
 
-        //state.setToRandomPositions(joint_group);
-        //result = state.setFromIK(joint_group,pose.pose,1,0.05,boost::bind(&isIKSolutionValid,planning_scene.get(), kset.empty() ? NULL : &kset, _1, _2, _3));
-        position[0] = 6.97438;
+        state.setToRandomPositions(joint_group);
+        result = state.setFromIK(joint_group,pose.pose,1,0.05,boost::bind(&isIKSolutionValid,planning_scene.get(), kset.empty() ? NULL : &kset, _1, _2, _3));
+        /*position[0] = 6.97438;
         position[1] = 0.339564;
         position[2] = 7.41066;
         position[3] = -3.14159;
@@ -1618,9 +1649,9 @@ bool PlannerInterface::planToPoseWithMultipleIK(const moveit_msgs::PlanningScene
             ROS_ERROR_STREAM(state);
         else
             ROS_ERROR_STREAM("invalid solution!");
-        //state.setToRandomPositions(joint_group);
-        //result = state.setFromIK(joint_group,pose.pose,1,0.05,boost::bind(&isIKSolutionValid,planning_scene.get(), kset.empty() ? NULL : &kset, _1, _2, _3));
-        position[0] = 4.94383;
+        state.setToRandomPositions(joint_group);
+        result = state.setFromIK(joint_group,pose.pose,1,0.05,boost::bind(&isIKSolutionValid,planning_scene.get(), kset.empty() ? NULL : &kset, _1, _2, _3));
+        /*position[0] = 4.94383;
         position[1] = 0.142116;
         position[2] = 7.33613;
         position[3] = -0.489466;
@@ -1688,7 +1719,7 @@ bool PlannerInterface::planToPoseWithMultipleIK(const moveit_msgs::PlanningScene
 
         for(std::map<std::vector<int>,int>::iterator it=added.begin();it!=added.end();++it)
         {
-            //ROS_INFO_STREAM(" added with step "<<it->second);
+            ROS_INFO_STREAM(" added with step "<<it->second);
             if(it->second<min_added_expansion)
             {
                 ROS_INFO_STREAM("found smaller added with old step "<<min_added_expansion<<" and new "<<it->second);
@@ -1697,7 +1728,7 @@ bool PlannerInterface::planToPoseWithMultipleIK(const moveit_msgs::PlanningScene
         }
         for(std::map<std::vector<int>,int>::iterator it=removed.begin();it!=removed.end();++it)
         {
-            //ROS_INFO_STREAM("removed with step "<<it->second);
+            ROS_INFO_STREAM("removed with step "<<it->second);
             if(it->second<min_removed_expansion)
             {
                 ROS_INFO_STREAM("found smaller removed with old step "<<min_removed_expansion<<" and new "<<it->second);
@@ -1718,7 +1749,7 @@ bool PlannerInterface::planToPoseWithMultipleIK(const moveit_msgs::PlanningScene
     else
     {
         if (!plan(req.allowed_planning_time, path)) {
-            ROS_ERROR("Failed to re-plan within alotted time frame (%0.2f seconds, %d expansions)", req.allowed_planning_time, m_planner->get_n_expands());
+            ROS_ERROR("Failed to plan within alotted time frame (%0.2f seconds, %d expansions)", req.allowed_planning_time, m_planner->get_n_expands());
             res.error_code.val = moveit_msgs::MoveItErrorCodes::PLANNING_FAILED;
             return false;
         }

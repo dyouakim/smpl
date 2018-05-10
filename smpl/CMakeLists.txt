@@ -111,6 +111,7 @@ src/distance_map/chessboard_distance_map.cpp
     src/search/experience_graph_planner.cpp
     src/search/adaptive_planner.cpp
     src/search/trastar.cpp
+    src/search/mhtrastar.cpp
     src/search/marastar.cpp
     src/search/focal_mhastar.cpp
     src/search/meta_mhastar_dts.cpp
