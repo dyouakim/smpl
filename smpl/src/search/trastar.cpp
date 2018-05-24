@@ -109,10 +109,7 @@ int TRAStar::replan(const TimeParameters& params,std::vector<int>* solution,int*
     start_state = getSearchState(m_start_state_id);
     goal_state = getSearchState(m_goal_state_id);
 
-    ROS_INFO_STREAM("Start State "<<start_state->state_id<< " has :");
-    ROS_INFO_STREAM("h-val "<<start_state->h<<" and g-val "<<start_state->g<<" and f-val "<<start_state->f);            
-    ROS_INFO_STREAM("E "<<start_state->E<<" and C "<<start_state->C);
-
+   
     ROS_INFO_STREAM("Goal State "<<goal_state->state_id<< " has :");
     ROS_INFO_STREAM("h-val "<<goal_state->h<<" and g-val "<<goal_state->g<<" and f-val "<<goal_state->f);            
     ROS_INFO_STREAM("E "<<goal_state->E<<" and C "<<goal_state->C<<",call "<<goal_state->call_number);
@@ -129,6 +126,11 @@ int TRAStar::replan(const TimeParameters& params,std::vector<int>* solution,int*
         
         initializeStartStates();
         SMPL_ERROR_NAMED(SLOG, "Initialize multiple search starts");
+
+        ROS_INFO_STREAM("Start State "<<start_state->state_id<< " has :");
+        ROS_INFO_STREAM("h-val "<<start_state->h<<" and g-val "<<start_state->g<<" and f-val "<<start_state->f);            
+        ROS_INFO_STREAM("E "<<start_state->E<<" and C "<<start_state->C);
+
 
 
         /*start_state->g = 0;
@@ -535,6 +537,7 @@ void TRAStar::expand(TRAState* s)
     m_space->GetPredsByGroupAndExpansion(s->state_id, &succs, &costs,-1, expansion_step);
 
     ROS_INFO_NAMED(SELOG, " State %zu has %zu successors with expansion step %zu", s->state_id,succs.size(),expansion_step);
+   
     
     for (size_t sidx = 0; sidx < succs.size(); ++sidx) 
     {
@@ -543,14 +546,7 @@ void TRAStar::expand(TRAState* s)
 
         TRAState* succ_state = getSearchState(succ_state_id);
         reinitSearchState(succ_state);
-        if(succ_state_id==0)
-        {
-            ROS_WARN_STREAM("Goal state is here ! with values: ");
-            ROS_INFO_STREAM("state call vs call "<<succ_state->call_number<<","<<m_call_number);
-            ROS_INFO_STREAM("h-val "<<succ_state->h<<" and g-val "<<succ_state->g<<" and f-val "<<succ_state->f);            
-        }
         
-
         int new_cost = s->eg + cost;
         ROS_INFO_NAMED(SELOG, "Compare new cost %d vs old cost %d for state %i ", new_cost, succ_state->g, succ_state->state_id, s->g);
         if (new_cost < succ_state->g) {
@@ -582,6 +578,8 @@ void TRAStar::expand(TRAState* s)
     }
 
     expansion_step++;
+     
+
 }
 
 // Recompute heuristics for all states.
@@ -620,6 +618,7 @@ TRAState* TRAStar::getSearchState(int state_id)
     if (state == NULL) {
         state = createState(state_id);
     }
+    
 return state;
 }
 
@@ -641,7 +640,6 @@ TRAState* TRAStar::createState(int state_id)
     ss->f = INFINITECOST;
     ss->eg = INFINITECOST;
     ss->iteration_closed = 0;
-    ss->call_number = m_call_number;
     ss->bestpredstate = nullptr;
     ss->bestnextstate = nullptr;
     ss->incons = false;
@@ -660,7 +658,9 @@ void TRAStar::reinitSearchState(TRAState* state)
         state->g = INFINITECOST;
         state->h = m_heur->GetGoalHeuristic(state->state_id);
         if(state->state_id==0)
-            ROS_INFO_STREAM("Reinitialize state "<< state->state_id<<" and h "<<state->h);
+            ROS_INFO_STREAM("Reinitialize Goal state "<< state->state_id<<" and h "<<state->h);
+        if(state->state_id==1)
+            ROS_INFO_STREAM("Reinitialize Start state "<< state->state_id<<" and h "<<state->h<<","<<m_call_number<<","<<state->call_number);
         state->f = INFINITECOST;
         state->eg = INFINITECOST;
         state->iteration_closed = 0;
@@ -715,9 +715,9 @@ bool TRAStar::RestoreSearchTree(int restoreStep)
             bool addedToSeen = false;
             
             //Start states
-            if(current->state_id>0 && current->state_id<5)
+            if(current->state_id>0 && current->state_id<=m_start_states_ids.size())
             {
-                current->g = 0;
+                //current->g = 0;
                 current->C = 0;
                 std::vector<int> parents(0);
                 current->parent_hist = parents;
@@ -743,15 +743,17 @@ bool TRAStar::RestoreSearchTree(int restoreStep)
                 {
                     SMPL_INFO_STREAM("Fully Restored ! "<<parentGVal);
                     updateParents(current,restoreStep,latestParenIdx,parentGVal);
-                    if(current->state_id > 5)
+                    if(current->state_id > m_start_states_ids.size())
+                    {
                         current->bestpredstate = seen_states[latestParenIdx];
+                        current->g  = parentGVal;
+                        current->h = m_heur->GetGoalHeuristic(current->state_id);
+                        current->f = computeKey(current);
+                    }
                     else
                         current->bestpredstate = nullptr;
                         
-                    current->g = parentGVal;
-                    current->eg  = parentGVal;
-                    current->h = m_heur->GetGoalHeuristic(current->state_id);
-                    current->f = computeKey(current);
+                    current->eg = current->g;
                     if(current->bestpredstate)
                         ROS_WARN_STREAM("after restoring pred is "<<current->bestpredstate->state_id);
                     else
@@ -771,15 +773,17 @@ bool TRAStar::RestoreSearchTree(int restoreStep)
                     SMPL_INFO_STREAM("State generated only! ");
                     
                     updateParents(current,restoreStep,latestParenIdx,parentGVal);
-                    if(current->state_id > 5)
+                    if(current->state_id > m_start_states_ids.size())
+                    {
                         current->bestpredstate = seen_states[latestParenIdx];
+                        current->g = parentGVal;
+                        current->h = m_heur->GetGoalHeuristic(current->state_id);
+                        current->f = computeKey(current);
+                    }
                     else
                         current->bestpredstate = nullptr;
 
-                    current->g = parentGVal;
                     current->v = INFINITECOST;
-                    current->h = m_heur->GetGoalHeuristic(current->state_id);
-                    current->f = computeKey(current);
                     current->E = INFINITECOST;
                     current->eg  = INFINITECOST;
                     //current->bestpredstate = 
@@ -911,8 +915,8 @@ void TRAStar::heuristicChanged()
     std::vector<unsigned int> inconsE;
 
     RestoreSearchTree(restore_step);
-
     recomputeHeuristics();
+    
     reorderOpen();
     //How the edges are identified (cell to edge mapping), I don't see it handled here
     /*while(!done)
@@ -957,6 +961,10 @@ void TRAStar::InitializeSearch()
 
 void TRAStar::initializeStartStates()
 {
+    std::vector<int> succs;
+    std::vector<int> costs;
+    m_space->GetPredsByGroupAndExpansion(-1, &succs, &costs,-1, -1);
+    int minCostIdx = std::distance(costs.begin(),std::min_element(costs.begin(),costs.end()));
     for(int i=0;i<m_start_states_ids.size();i++)
     {
 
@@ -970,20 +978,24 @@ void TRAStar::initializeStartStates()
         }
 
 
-        state->g = 0;
+        state->g = costs[i];
+        state->h = m_heur->GetGoalHeuristic(state->state_id);
         state->f = computeKey(state);
+        SMPL_INFO_STREAM("Start state with ID "<<state->state_id<<", has a heuristics "<<state->f<<" and g-val "<<costs[i]);
         state->C = 0;
         state->E = INFINITECOST;
         std::vector<int> parents(0);
         state->parent_hist = parents;
         state->gval_hist.push_back(0);
         state->bestpredstate = nullptr;
+        state->call_number = m_call_number;
         m_open.push(state);
         
         if(i==0)
             start_state = state;
-
-        seen_states.push_back(state);
+        
+        if(i==minCostIdx)
+            seen_states.push_back(state);
     }
 }
 
