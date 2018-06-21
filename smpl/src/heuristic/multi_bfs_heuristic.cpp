@@ -55,7 +55,7 @@ void MultiBfsHeuristic::setCostPerCell(int cost_per_cell)
 
 void MultiBfsHeuristic::updateGoal(const GoalConstraint& goal)
 {
-    int gx, gy, gz;
+    int gx, gy, gz, base_gx, base_gy, base_gz;
     grid()->worldToGrid(
             goal.tgt_off_pose[0], goal.tgt_off_pose[1], goal.tgt_off_pose[2],
             gx, gy, gz);
@@ -64,7 +64,7 @@ void MultiBfsHeuristic::updateGoal(const GoalConstraint& goal)
     m_goal_y = gy;
     m_goal_z = gz;
 
-    SMPL_DEBUG_NAMED(LOG, "Setting the BFS heuristic goal (%d, %d, %d)", gx, gy, gz);
+    SMPL_ERROR_NAMED(LOG, "Setting the BFS heuristic goal (%d, %d, %d)", gx, gy, gz);
     SMPL_ERROR_STREAM("Origin_arm "<<gx<<","<<gy<<","<<gz);
     
     int listSize = ((double)(1.8/grid()->resolution()))+1;
@@ -93,10 +93,6 @@ void MultiBfsHeuristic::updateGoal(const GoalConstraint& goal)
                 inputGoals[idx]  = gx + xSign;
                 inputGoals[idx+1] = gy + ySign;
                 inputGoals[idx+2] = gz + zSign;
-                /*SMPL_ERROR_STREAM("indices: "<<i<<","<<j<<","<<k);
-                SMPL_ERROR_STREAM("Element at  ["<<
-                    idx<<","<<(idx+1)<<","<<(idx+2)<<"] is "<<
-                    inputGoals[idx]<<","<<inputGoals[idx+1]<<","<<inputGoals[idx+2]); */
                 
                 Eigen::Vector3d p;
                 grid()->gridToWorld( inputGoals[idx],  inputGoals[idx+1],  inputGoals[idx+2], p.x(), p.y(), p.z());
@@ -119,16 +115,28 @@ void MultiBfsHeuristic::updateGoal(const GoalConstraint& goal)
             "bfs_base_goals"));
 
     int numGoals = m_bfs[GroupType::BASE]->run < std::vector<int>::iterator >(inputGoals.begin(),inputGoals.end());
-
-    if (!m_bfs[GroupType::ARM]->inBounds(gx, gy, gz) || !numGoals) {
+    
+    if (!m_bfs[GroupType::ARM]->inBounds(gx, gy, gz) || !numGoals)
+    {
         SMPL_ERROR_NAMED(LOG, "Heuristic goal is out of BFS bounds");
     }
-    else
+    /*else
     {
         SMPL_ERROR_STREAM("Number of base goal added "<<numGoals);
-    }
+    }*/
 
     m_bfs[GroupType::ARM]->run(gx, gy, gz);
+
+    /*grid()->worldToGrid(
+            goal.angles[0], goal.angles[1], goal.angles[2],
+            base_gx, base_gy, base_gz);
+
+    SMPL_ERROR_STREAM("Base Goal :"<<goal.angles[0]<<","<<goal.angles[1]<<","<<goal.angles[2]
+        <<","<<base_gx<<","<<base_gy<<","<<base_gz);
+    
+
+    m_bfs[GroupType::BASE]->run(base_gx,base_gy,base_gz);*/
+
 
     if (!m_pp) {
         return ;
@@ -245,9 +253,9 @@ int MultiBfsHeuristic::GetGoalHeuristic(int state_id, int planning_group, int ba
 
     Eigen::Vector3i dp;
     grid()->worldToGrid(p.x(), p.y(), p.z(), dp.x(), dp.y(), dp.z());
-   /* SMPL_WARN_STREAM("Getting distance heursitic for group "<<planning_group);
-    SMPL_WARN_STREAM("get heursitic for grid point "<<dp.x()<<","<<dp.y()<<","<<dp.z());
-    SMPL_WARN_STREAM("get heursitic for world point "<<p.x()<<","<<p.y()<<","<<p.z());*/
+    SMPL_DEBUG_STREAM("Getting distance heursitic for group "<<planning_group);
+    SMPL_DEBUG_STREAM("get heursitic for grid point "<<dp.x()<<","<<dp.y()<<","<<dp.z());
+    SMPL_DEBUG_STREAM("get heursitic for world point "<<p.x()<<","<<p.y()<<","<<p.z());
     
    int cost  = getBfsCostToGoal(*m_bfs[planning_group], dp.x(), dp.y(), dp.z());
    return cost;
@@ -453,7 +461,7 @@ void MultiBfsHeuristic::syncGridAndBfs()
     }
 
     SMPL_ERROR_NAMED(LOG, "%d/%d (%0.3f%%) walls in the bfs heuristic", wall_count, cell_count, 100.0 * (double)wall_count / cell_count);
-    SMPL_ERROR_NAMED(LOG, "%d/%d (%0.3f%%) walls in the base bfs heuristic", base_wall_count, cell_count, 100.0 * (double)base_wall_count / cell_count);
+    SMPL_ERROR_NAMED(LOG, "%d/%d (%0.3f%%) walls in the base bfs heuristic of radius (%0.3f)", base_wall_count, cell_count, 100.0 * (double)base_wall_count / cell_count, m_base_inflation_radius);
 }
 
 int MultiBfsHeuristic::getBfsCostToGoal(const BFS_3D& bfs, int x, int y, int z) const
