@@ -890,7 +890,7 @@ PlannerInterface::PlannerInterface(
     m_planner_factories["mhtrastar"] = MakeMHTRAStar;
     m_planner_factories["marastar"] = MakeMARAStar;
 
-    ROS_WARN_STREAM("grid # occupied "<<m_grid->getOccupiedVoxelCount()<< " and frame "<<m_grid->getReferenceFrame());
+    ROS_ERROR_STREAM("grid # occupied "<<m_grid->getOccupiedVoxelCount()<< " and frame "<<m_grid->getReferenceFrame()<<" and res is "<<m_grid->resolution());
     SV_SHOW_INFO_NAMED("OCCUPIED", m_grid->getOccupiedVoxelsVisualization());
 }
 
@@ -1064,7 +1064,7 @@ bool PlannerInterface::checkParams(
     return true;
 }
 
-bool PlannerInterface::setMultipleStart(std::vector<moveit_msgs::RobotState>& states)
+bool PlannerInterface::setMultipleStart(std::vector<moveit_msgs::RobotState>& states, int best_idx)
 {
     ROS_INFO_NAMED(PI_LOGGER, "set multiple start configuration");
 
@@ -1091,8 +1091,11 @@ bool PlannerInterface::setMultipleStart(std::vector<moveit_msgs::RobotState>& st
         }
     }
 
-    //ROS_INFO_STREAM("Initial joint variables: " << initial_positions);
 
+    //ROS_INFO_STREAM("Initial joint variables: " << initial_positions);
+    /*RobotState best = initial_positions[best_idx];
+    initial_positions.clear();
+    initial_positions.push_back(best);*/
     if (!m_pspace->setMultipleStart(initial_positions)) {
         ROS_ERROR("Failed to set start state");
         return false;
@@ -1314,7 +1317,7 @@ bool PlannerInterface::setGoalPosition(
 bool PlannerInterface::replan(double allowed_time, std::vector<RobotState>& path, int restore_step)
 {
     
-    ROS_WARN_STREAM("RE-Planning!!!!! by restoring tree at step "<<restore_step);
+    ROS_INFO_STREAM("RE-Planning!!!!! by restoring tree at step "<<restore_step);
     
     //SV_SHOW_INFO_NAMED("bfs_walls_replan", getBfsWallsVisualization());
     //SV_SHOW_INFO_NAMED("bfs_values_replan", getBfsValuesVisualization());
@@ -1420,7 +1423,7 @@ bool PlannerInterface::planToPose(const moveit_msgs::PlanningScene& scene_msg,
     std::string space_name;
 
     parsePlannerID(m_planner_id, space_name, heuristic_name, search_name);
-    if (search_name == "trastar")
+    if (search_name == "trastar" || search_name == "mhtrastar")
         return planToPoseWithMultipleIK(scene_msg, req,path,res);
 
     const auto& goal_constraints_v = req.goal_constraints;
@@ -1519,13 +1522,14 @@ bool PlannerInterface::planToPoseWithMultipleIK(const moveit_msgs::PlanningScene
     
     if(lastPlanRequestId_!=req.request_id)
     {
+        ROS_INFO_STREAM("New request received with id "<<req.request_id);
         const moveit_msgs::PositionConstraint& position_constraint = goal_constraints.position_constraints.front();
         const moveit_msgs::OrientationConstraint& orientation_constraint = goal_constraints.orientation_constraints.front();
 
         const geometry_msgs::Pose& primitive_pose = position_constraint.constraint_region.primitive_poses.front();
         moveit_msgs::RobotState goalAsStart;
         
-        ros::Time start = ros::Time::now();
+        ros::Time startTime = ros::Time::now();
 
         geometry_msgs::PoseStamped pose;
         pose.header.frame_id="world";
@@ -1543,138 +1547,39 @@ bool PlannerInterface::planToPoseWithMultipleIK(const moveit_msgs::PlanningScene
         const moveit::core::JointModelGroup* joint_group = state.getJointModelGroup(req.group_name);
         bool result = true;
         state.setFromIK(joint_group,pose.pose,1,0.05,boost::bind(&isIKSolutionValid,planning_scene.get(), kset.empty() ? NULL : &kset, _1, _2, _3));
-        /*std::vector<double> position(8,0);
-        position[0] = 5.24673;
-        position[1] = 0.765405;
-        position[2] = 7.24129;
-        position[3] = -1.15375;
-        position[4] = 0.909369;
-        position[5] = -0.05;
-        position[6] = 0.107007;
-        position[7] = 0.243545;
-        state.setVariablePositions(position);/*
+        
         std::vector<double> position(8,0);
-        position[0] = 6.50492; 
-        position[1] = -0.121328;
-        position[2] = 4.04129;
-        position[3] = 3.14159;
-        position[4] = 0.909369;
-        position[5] = -0.0499739;
-        position[6] = 0.106975;
-        position[7] = 2.23138;
-        state.setVariablePositions(position);*/
         moveit::core::robotStateToRobotStateMsg(state,goalAsStart);
-        start_states.push_back(goalAsStart);
+        
         if(result)
-            ROS_ERROR_STREAM(state);
-        else
-            ROS_ERROR_STREAM("invalid solution!");
-        state.setToRandomPositions(joint_group);
-        result = state.setFromIK(joint_group,pose.pose,1,0.05,boost::bind(&isIKSolutionValid,planning_scene.get(), kset.empty() ? NULL : &kset, _1, _2, _3));
-        /*position[0] = 6.90329;
-        position[1] = -0.580802;
-        position[2] = 7.24129;
-        position[3] = 2.20981;
-        position[4] = 0.909369;
-        position[5] = -0.0499952;
-        position[6] = 0.106997;
-        position[7] = -3.12;
-        state.setVariablePositions(position);/*
-
-        position[0] = 6.34891;
-        position[1] = -1.07949;
-        position[2] =  4.21642;
-        position[3] = 2.20981; 
-        position[4] = 0.909369;
-        position[5] = 0.766336;
-        position[6] = -0.709335;
-        position[7] = -3.12;
-        state.setVariablePositions(position);*/
-        moveit::core::robotStateToRobotStateMsg(state,goalAsStart);
-        start_states.push_back(goalAsStart);
-        if(result)
-            ROS_ERROR_STREAM(state);
-        else
-            ROS_ERROR_STREAM("invalid solution!");
-        state.setToRandomPositions(joint_group);
-        result = state.setFromIK(joint_group,pose.pose,1,0.05,boost::bind(&isIKSolutionValid,planning_scene.get(), kset.empty() ? NULL : &kset, _1, _2, _3));
-        /*position[0] = 5.90277;
-        position[1] = -1.06694;
-        position[2] = 7.31017;
-        position[3] = 1.12096;
-        position[4] = 0.909368;
-        position[5] = 0.249574;
-        position[6] = -0.192573;
-        position[7] = -2.03116;
-        state.setVariablePositions(position);/*
-        position[0] = 6.46252; 
-        position[1] = -0.93194;
-        position[2] =  4.16748;
-        position[3] =  2.37032;
-        position[4] =  0.909369;
-        position[5] =  0.512048;
-        position[6] =  -0.455046;
-        position[7] =  3.00266;
-        state.setVariablePositions(position);*/
-        moveit::core::robotStateToRobotStateMsg(state,goalAsStart);
-        start_states.push_back(goalAsStart);
-        if(result)
-            ROS_ERROR_STREAM(state);
+        {
+            start_states.push_back(goalAsStart);
+            ROS_ERROR_STREAM("found!");
+            ROS_INFO_STREAM(state);
+        }
+            
         else
             ROS_ERROR_STREAM("invalid solution!");
 
-        state.setToRandomPositions(joint_group);
-        result = state.setFromIK(joint_group,pose.pose,1,0.05,boost::bind(&isIKSolutionValid,planning_scene.get(), kset.empty() ? NULL : &kset, _1, _2, _3));
-        /*position[0] = 6.97438;
-        position[1] = 0.339564;
-        position[2] = 7.41066;
-        position[3] = -3.14159;
-        position[4] = 0.909369;
-        position[5] = 0.733919;
-        position[6] = -0.676917;
-        position[7] = 2.2314;
-        state.setVariablePositions(position);
-        /*position[0] =  6.05584; 
-        position[1] = -1.29223;
-        position[2] =   4.27289;
-        position[3] =  1.89073;
-        position[4] =   0.909369;
-        position[5] =   1.16727;
-        position[6] =   -1.11027;
-        position[7] =  -2.80093;
-        state.setVariablePositions(position);*/
-        moveit::core::robotStateToRobotStateMsg(state,goalAsStart);
-        start_states.push_back(goalAsStart);
-        if(result)
-            ROS_ERROR_STREAM(state);
-        else
-            ROS_ERROR_STREAM("invalid solution!");
-        state.setToRandomPositions(joint_group);
-        result = state.setFromIK(joint_group,pose.pose,1,0.05,boost::bind(&isIKSolutionValid,planning_scene.get(), kset.empty() ? NULL : &kset, _1, _2, _3));
-        /*position[0] = 4.94383;
-        position[1] = 0.142116;
-        position[2] = 7.33613;
-        position[3] = -0.489466;
-        position[4] = 0.909369;
-        position[5] = 0.365654;
-        position[6] = -0.308652;
-        position[7] = -0.420736;
-        state.setVariablePositions(position);/*
-        position[0] = 5.96204;
-        position[1] =  0.349353;
-        position[2] =  4.27343;
-        position[3] =  -2.36024;
-        position[4] =  0.909369;
-        position[5] = 1.1725;
-        position[6] =  -1.11549;
-        position[7] = 1.45004;
-        state.setVariablePositions(position);*/
-        moveit::core::robotStateToRobotStateMsg(state,goalAsStart);
-        start_states.push_back(goalAsStart);
-        if(result)
-            ROS_ERROR_STREAM(state);
-        else
-            ROS_ERROR_STREAM("invalid solution!");
+        /* Start sampling the yaw and generate 12 seeds covering different yaws */
+        std::vector<double> yawDecomposition = {0,0.52,1.0, 1.57, 2.0, 2.6, 3.14, 3.66, 4.1, 4.7, 5.2, 5.8};
+        for(int i=0; i<yawDecomposition.size(); i++)
+        {
+            state.setToRandomPositions(joint_group);
+            state.setVariablePosition(state.getVariableNames()[3], yawDecomposition[i]);
+            
+            result = state.setFromIK(joint_group,pose.pose,1,0.05,boost::bind(&isIKSolutionValid,planning_scene.get(), kset.empty() ? NULL : &kset, _1, _2, _3));
+            moveit::core::robotStateToRobotStateMsg(state,goalAsStart);
+            if(result)
+            {
+                start_states.push_back(goalAsStart);
+                ROS_DEBUG_STREAM("found!");
+                ROS_INFO_STREAM(state);
+            }
+            else
+                ROS_ERROR_STREAM("invalid solution!");
+        }
+        
         /*const planning_scene::PlanningScenePtr planning_scene(new planning_scene::PlanningScene(robot_model_loader.getModel()));
 
         kinematic_constraints::KinematicConstraintSet kset(robot_model_loader.getModel());
@@ -1697,8 +1602,17 @@ bool PlannerInterface::planToPoseWithMultipleIK(const moveit_msgs::PlanningScene
             std::getchar();  
         }*/
         
-        ROS_ERROR_STREAM("first  duration "<<(ros::Time::now()-start).toSec());
-        if (!setMultipleStart(start_states)) {
+        if(start_states.size()==0)
+        {
+             ROS_ERROR("Failed to set initial configuration of robot");
+            res.error_code.val = moveit_msgs::MoveItErrorCodes::START_STATE_IN_COLLISION;
+            return false;
+        }
+       
+
+        ROS_ERROR_STREAM("first  duration "<<(ros::Time::now()-startTime).toSec());
+        
+        if (!setMultipleStart(start_states, 0)) {
             ROS_ERROR("Failed to set initial configuration of robot");
             res.error_code.val = moveit_msgs::MoveItErrorCodes::START_STATE_IN_COLLISION;
             return false;
@@ -1739,7 +1653,7 @@ bool PlannerInterface::planToPoseWithMultipleIK(const moveit_msgs::PlanningScene
         int restore_step = std::min(min_added_expansion,min_removed_expansion);
 
         resetCellsMarking(restore_step);
-
+        
         if (!replan(req.allowed_planning_time, path, restore_step)) {
             ROS_ERROR("Failed to re-plan within alotted time frame (%0.2f seconds, %d expansions)", req.allowed_planning_time, m_planner->get_n_expands());
             res.error_code.val = moveit_msgs::MoveItErrorCodes::PLANNING_FAILED;
@@ -2230,9 +2144,13 @@ bool PlannerInterface::reinitPlanner(const std::string& planner_id)
             m_pspace->insertHeuristic(entry.second.get());
         }
 
-        if(search_name=="trastar")
-        {
+        if(search_name=="trastar") {
             (dynamic_cast<TRAStar*> (m_planner.get()))->updateHeuristic(begin(m_heuristics)->second.get());
+        }
+        else if(search_name=="mhtrastar")
+        {
+            (dynamic_cast<MHTRAStar*> (m_planner.get()))->updateHeuristic(begin(m_heuristics)->second.get());
+
         }
         return true;
     }
