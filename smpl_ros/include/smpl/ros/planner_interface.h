@@ -194,7 +194,7 @@ protected:
     bool setStart(const moveit_msgs::RobotState& state);
 
     // Set start configuration
-    bool setMultipleStart(std::vector<moveit_msgs::RobotState>& states);
+    bool setMultipleStart(std::vector<moveit_msgs::RobotState>& states, int best_idx);
 
     // Set goal(s)
     bool setGoalPosition(const moveit_msgs::Constraints& goals);
