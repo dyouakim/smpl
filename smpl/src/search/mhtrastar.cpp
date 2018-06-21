@@ -63,7 +63,6 @@ MHTRAStar::MHTRAStar( DiscreteSpaceInformation* space, Heuristic* heuristic, boo
     m_time_params.max_expansions = 0;
     m_time_params.max_allowed_time_init = clock::duration::zero();
     m_time_params.max_allowed_time = clock::duration::zero();
-    ROS_WARN_STREAM("TRA* constructor");
 }
 
 MHTRAStar::~MHTRAStar()
@@ -109,17 +108,13 @@ int MHTRAStar::replan(const TimeParameters& params,std::vector<int>* solution,in
 
     m_time_params = params;
     
-    //start_state = getSearchState(m_start_state_id);
+    start_state = getSearchState(m_start_state_id);
     goal_state = getSearchState(m_goal_state_id);
 
-    /*SMPL_INFO_STREAM("Start State "<<start_state->state_id<< " has :");
-    SMPL_INFO_STREAM("h-val "<<start_state->h<<" and g-val "<<start_state->g<<" and f-val "<<start_state->f);            
-    SMPL_INFO_STREAM("E "<<start_state->E<<" and C "<<start_state->C);
+    ROS_INFO_STREAM("Goal State "<<goal_state->state_id<< " has :");
+    ROS_INFO_STREAM("h-val "<<goal_state->h[0]<<" & "<<goal_state->h[1]<<" and g-val "<<goal_state->g<<" and f-val "<<goal_state->f[0]<<" & "<<goal_state->f[1]);            
+    ROS_INFO_STREAM("E "<<goal_state->E<<" and C "<<goal_state->C<<",call "<<goal_state->call_number);
 
-    SMPL_INFO_STREAM("Goal State "<<goal_state->state_id<< " has :");
-    SMPL_INFO_STREAM("h-val "<<goal_state->h<<" and g-val "<<goal_state->g<<" and f-val "<<goal_state->f);            
-    SMPL_INFO_STREAM("E "<<goal_state->E<<" and C "<<goal_state->C<<",call "<<goal_state->call_number);
-*/
 
     if (m_start_state_id != m_last_start_state_id) {
         SMPL_INFO_STREAM("Start changed: Reinitialize search");
@@ -130,14 +125,17 @@ int MHTRAStar::replan(const TimeParameters& params,std::vector<int>* solution,in
         ++m_call_number; // trigger state reinitializations
 
 
-        SMPL_ERROR_NAMED(SLOG, "Reinitialize search goal");
+        SMPL_INFO_NAMED(SLOG, "Reinitialize search goal");
         reinitSearchState(goal_state);
         
         initializeStartStates();
-        SMPL_ERROR_NAMED(SLOG, "Initialize multiple search starts");
-        //reinitSearchState(start_state);
-
+        SMPL_INFO_NAMED(SLOG, "Initialize multiple search starts");
         
+        /*ROS_INFO_STREAM("Start State "<<start_state->state_id<< " has :");
+        ROS_INFO_STREAM("h-val "<<start_state->h[0]<<" & "<<start_state->h[1]<<" and g-val "<<start_state->g<<" and f-val "<<start_state->f[0]<<" & "<<start_state->f[1]);            
+        ROS_INFO_STREAM("E "<<start_state->E<<" and C "<<start_state->C);*/
+
+        start_state = m_states[m_start_state_id];
         m_iteration = 1; // 0 reserved for "not closed on any iteration"
 
         m_expand_count_init = 0;
@@ -152,6 +150,7 @@ int MHTRAStar::replan(const TimeParameters& params,std::vector<int>* solution,in
 
         m_last_start_state_id = m_start_state_id;
 
+        //TO CHECK???
         expansion_step = 1;
 
     }
@@ -167,7 +166,7 @@ int MHTRAStar::replan(const TimeParameters& params,std::vector<int>* solution,in
 
     if(costChanged)
     {
-        ROS_WARN_NAMED(SLOG, "Cost Changed!!!");
+        ROS_INFO_STREAM("Cost Changed!!!");
         heuristicChanged();
         m_last_goal_state_id = m_goal_state_id;
 
@@ -181,6 +180,7 @@ int MHTRAStar::replan(const TimeParameters& params,std::vector<int>* solution,in
 
         m_satisfied_eps = std::numeric_limits<double>::infinity();
         costChanged = false;
+       
     }
 
     auto start_time = clock::now();
@@ -210,14 +210,15 @@ int MHTRAStar::replan(const TimeParameters& params,std::vector<int>* solution,in
             ROS_INFO_NAMED(SLOG, "Begin new search iteration %d with epsilon = %0.3f", m_iteration, m_curr_eps);
         }
         err = improvePath(start_time, goal_state, num_expansions, elapsed_time);
+        ROS_INFO_STREAM("Improve done with result "<<err);
         if (m_curr_eps == m_initial_eps) {
             m_expand_count_init += num_expansions;
             m_search_time_init += elapsed_time;
         }
 
-        /*if (err) {
-            break;
-        }*/
+        if (err) {
+            !err;
+        }
         ROS_INFO_NAMED(SLOG, "Improved solution with err %i", err);
         m_satisfied_eps = m_curr_eps;
     }
@@ -510,15 +511,18 @@ int MHTRAStar::improvePath( const clock::time_point& start_time,MHTRAState* goal
         auto now = clock::now();
         elapsed_time = now - start_time;
         MHTRAState* min_state;
-    
+        
+       // ROS_INFO_STREAM("Min f-val "<<min_state->f[0]<<" & "<<min_state->f[1]<<" vs. goal f-val "<<goal_state->f);
+
         if(!m_open_base_iso.empty())
             {
                 min_state = m_open_base_iso.min();
 
-                SMPL_INFO_STREAM("Base_iso min state "<<min_state->state_id<<" and f-val "<<min_state->f[0]);
-                auto now = clock::now();
-                elapsed_time = now - start_time;
 
+                SMPL_INFO_STREAM("Base_iso min state "<<min_state->state_id<<" has a heuristics "<<min_state->h[0]<<" & "<<min_state->h[1]<<" and g-val "<<min_state->g
+                <<" f-val "<<min_state->f[0]<<" & "<<min_state->f[1]);
+
+                   
                 // path to goal found
                 
                 if (min_state->f[0] >= goal_state->f[0] || min_state->f[1] >= goal_state->f[1] || min_state == goal_state) {
@@ -547,6 +551,14 @@ int MHTRAStar::improvePath( const clock::time_point& start_time,MHTRAState* goal
 
                 min_state->eg = min_state->g;
 
+                //Add the selected start state to the seen states
+                if(elapsed_expansions==1 && min_state->state_id>0 && min_state->state_id<m_start_states_ids.size())
+                {
+                    SMPL_INFO_STREAM("Adding the start state ["<<min_state->state_id<<"] to the seen_states");
+                    seen_states.push_back(min_state);
+                    m_space->displaySelectedGoal(min_state->state_id);
+                }
+
                 expand(min_state, sbpl::motion::GroupType(sbpl::motion::GroupType::BASE_ISO));
 
                 ++ elapsed_expansions;
@@ -561,9 +573,9 @@ int MHTRAStar::improvePath( const clock::time_point& start_time,MHTRAState* goal
             {
                 min_state = m_open_base.min();
 
-                SMPL_INFO_STREAM("Base min state "<<min_state->state_id<<" and f-val "<<min_state->f[0]);
-                auto now = clock::now();
-                elapsed_time = now - start_time;
+                SMPL_INFO_STREAM("Base min state "<<min_state->state_id<<" has a heuristics "<<min_state->h[0]<<" & "<<min_state->h[1]<<" and g-val "<<min_state->g
+                <<" f-val "<<min_state->f[0]<<" & "<<min_state->f[1]);
+               
 
                 // path to goal found
                 
@@ -605,7 +617,8 @@ int MHTRAStar::improvePath( const clock::time_point& start_time,MHTRAState* goal
             {
                 min_state = m_open_arm.min();
 
-                SMPL_INFO_STREAM("Arm min state "<<min_state->state_id<<" and f-val "<<min_state->f[1]);
+                SMPL_INFO_STREAM("Arm min state "<<min_state->state_id<<" has a heuristics "<<min_state->h[0]<<" & "<<min_state->h[1]<<" and g-val "<<min_state->g
+                <<" f-val "<<min_state->f[0]<<" & "<<min_state->f[1]);
 
                 // path to goal found
                 if (min_state->f[1] >= goal_state->f[1] || min_state->f[0] >= goal_state->f[0] || min_state == goal_state) {
@@ -673,14 +686,10 @@ void MHTRAStar::expand(MHTRAState* s, sbpl::motion::GroupType group)
 
     if(group==sbpl::motion::GroupType::BASE_ISO)
     {
-        //m_space->GetSuccsByGroupAndExpansion(s->state_id, &succs, &costs, sbpl::motion::GroupType::BASE, expansion_step); 
         m_space->GetPredsByGroupAndExpansion(s->state_id, &succs, &costs, sbpl::motion::GroupType::BASE, expansion_step); 
         
-        SMPL_INFO_STREAM("group "<<group<<" has "<<succs.size()<<" successors");
-        
-        ROS_WARN_STREAM("Expansion at step "<<expansion_step);
-        expansion_step++;
-
+        ROS_INFO_NAMED(SELOG, " State %zu has %zu successors with expansion step %zu", s->state_id,succs.size(),expansion_step);
+   
         for (size_t sidx = 0; sidx < succs.size(); ++sidx) {
             int succ_state_id = succs[sidx];
             int cost = costs[sidx];
@@ -690,7 +699,8 @@ void MHTRAStar::expand(MHTRAState* s, sbpl::motion::GroupType group)
             succ_state->source = group;
             int new_cost = s->eg + cost;
             bool addedToSeen = false;
-            SMPL_DEBUG_NAMED(SELOG, "Compare new cost %d vs old cost %d", new_cost, succ_state->g);
+            ROS_INFO_NAMED(SELOG, "Compare new cost %d vs old cost %d for state %i ", new_cost, succ_state->g, succ_state->state_id, s->g);
+            
             if (new_cost < succ_state->g) {
                 succ_state->g = new_cost;
                 succ_state->bestpredstate = s;
@@ -757,6 +767,11 @@ void MHTRAStar::expand(MHTRAState* s, sbpl::motion::GroupType group)
                 }
 
             }
+
+            ROS_INFO_STREAM("State "<<succ_state->state_id<< " has :");
+            ROS_INFO_STREAM("h-val "<<succ_state->h[0]<<" & "<<succ_state->h[1]<<" and g-val "<<succ_state->g<<" and f-val "<<succ_state->f[0]<<" & "<<succ_state->f[1]);            
+            ROS_INFO_STREAM("E "<<succ_state->E<<" and C "<<succ_state->C);
+
         }
     }
 
@@ -764,9 +779,7 @@ void MHTRAStar::expand(MHTRAState* s, sbpl::motion::GroupType group)
     {
        m_space->GetPredsByGroupAndExpansion(s->state_id, &succs, &costs, group, expansion_step); 
         
-        ROS_WARN_STREAM("Expansion at step "<<expansion_step);
-        expansion_step++;
-        SMPL_INFO_STREAM("group "<<group<<" has "<<succs.size()<<" successors");
+        ROS_INFO_NAMED(SELOG, " State %zu has %zu successors with expansion step %zu", s->state_id,succs.size(),expansion_step);
         
         for (size_t sidx = 0; sidx < succs.size(); ++sidx) {
             int succ_state_id = succs[sidx];
@@ -777,7 +790,8 @@ void MHTRAStar::expand(MHTRAState* s, sbpl::motion::GroupType group)
             succ_state->source = group;
             int new_cost = s->eg + cost;
             bool addedToSeen = false;
-            SMPL_DEBUG_NAMED(SELOG, "Compare new cost %d vs old cost %d", new_cost, succ_state->g);
+            ROS_INFO_NAMED(SELOG, "Compare new cost %d vs old cost %d for state %i ", new_cost, succ_state->g, succ_state->state_id, s->g);
+            
             if (new_cost < succ_state->g) {
                 succ_state->g = new_cost;
                 succ_state->bestpredstate = s;
@@ -831,9 +845,14 @@ void MHTRAStar::expand(MHTRAState* s, sbpl::motion::GroupType group)
                 }
 
             }
+
+            ROS_INFO_STREAM("State "<<succ_state->state_id<< " has :");
+            ROS_INFO_STREAM("h-val "<<succ_state->h[0]<<" & "<<succ_state->h[1]<<" and g-val "<<succ_state->g<<" and f-val "<<succ_state->f[0]<<" & "<<succ_state->f[1]);            
+            ROS_INFO_STREAM("E "<<succ_state->E<<" and C "<<succ_state->C);
+
         }
     }
-
+    expansion_step++;
 }
 
 // Recompute heuristics for all states.
@@ -842,27 +861,35 @@ void MHTRAStar::recomputeHeuristics()
     for (MHTRAState* s : m_states) {
         s->h[0] = m_heur->GetGoalHeuristic(s->state_id, sbpl::motion::GroupType::BASE,sbpl::motion::BaseGroupHeuristic::B1);
         s->h[1] = m_heur->GetGoalHeuristic(s->state_id, sbpl::motion::GroupType::ARM,sbpl::motion::BaseGroupHeuristic::NONE);
-       // SMPL_INFO_STREAM("Recompute for state: "<<s->state_id<<" Base heuristic is "<<s->h[0]<<" arm heuristic is "<<s->h[1]);
+        s->h[1] = std::max(s->h[0],s->h[1]);
+        /*SMPL_INFO_STREAM("Recompute for state: "<<s->state_id);
+        SMPL_INFO_STREAM(" Base heuristic is "<<s->h[0]<<" arm heuristic is "<<s->h[1]);*/
     }
 }
 
 // Recompute the f-values of all states in OPEN and reorder OPEN.
 void MHTRAStar::reorderOpen()
 {
-   ROS_DEBUG_STREAM("reorderOpen called!");
+   ROS_DEBUG_STREAM("reorderOpen called! with epsilon "<<m_curr_eps);
     
-    
-    for (auto it = m_open_base.begin(); it != m_open_base.end(); ++it) {
+    for (auto it = m_open_base_iso.begin(); it != m_open_base_iso.end(); ++it) {
         (*it)->f[0] = computeKey(*it, sbpl::motion::BASE);
-        //SMPL_INFO_STREAM("base Reorder for state: "<<(*it)->state_id<<" f-val "<<(*it)->f[0]);
+       /* SMPL_INFO_STREAM("base_iso Reorder for state: "<<(*it)->state_id<<"h-val "<<(*it)->h[0]<<" & "<<(*it)->h[1]<<"  g-val "<<
+            (*it)->g<<" and f-val "<<(*it)->f[0]);*/
     }
     m_open_base_iso.make(sbpl::motion::GroupType::BASE_ISO);
 
+    for (auto it = m_open_base.begin(); it != m_open_base.end(); ++it) {
+       /* (*it)->f[0] = computeKey(*it, sbpl::motion::BASE);
+        SMPL_INFO_STREAM("base Reorder for state: "<<(*it)->state_id<<"h-val "<<(*it)->h[0]<<" & "<<(*it)->h[1]<<"  g-val "<<
+            (*it)->g<<" and f-val "<<(*it)->f[0]);*/
+    }
     m_open_base.make(sbpl::motion::GroupType::BASE);
 
     for (auto it = m_open_arm.begin(); it != m_open_arm.end(); ++it) {
         (*it)->f[1] = computeKey(*it, sbpl::motion::ARM);
-        //SMPL_INFO_STREAM("arm Reorder for state: "<<(*it)->state_id<<" f-val "<<(*it)->f[1]);
+       /* SMPL_INFO_STREAM("arm Reorder for state: "<<(*it)->state_id<<"h-val "<<(*it)->h[0]<<" & "<<(*it)->h[1]<<"  g-val "<<
+            (*it)->g<<" and f-val "<<(*it)->f[1]);*/
     }
     m_open_arm.make(sbpl::motion::GroupType::ARM);
 
@@ -892,15 +919,31 @@ MHTRAState* MHTRAStar::getSearchState(int state_id)
 
 void MHTRAStar::initializeStartStates()
 {
-    for(int i=0;i<m_start_states_ids.size();i++)
+    std::vector<int> succs;
+    std::vector<double> costs;
+    bool result = m_space->updateMultipleStartStates(&succs, &costs, restore_step);
+    int minCostIdx = std::distance(costs.begin(),std::max_element(costs.begin(),costs.end()));
+
+    for(int i=0;i<succs.size();i++)
     {
-        MHTRAState* state = getSearchState(m_start_states_ids[i]);
-        state->g = 0;
+        if (m_states.size() <= m_start_states_ids[i]) {
+            m_states.resize(m_start_states_ids[i] + 1, nullptr);
+        }
+
+        auto& state = m_states[m_start_states_ids[i]];
+        if (state == NULL) {
+            state = createState(m_start_states_ids[i]);
+        }
+
+        state->g = costs[i];
+        state->h[0] = m_heur->GetGoalHeuristic(state->state_id, sbpl::motion::GroupType::BASE,sbpl::motion::BaseGroupHeuristic::B1);
+        state->h[1] = m_heur->GetGoalHeuristic(state->state_id, sbpl::motion::GroupType::ARM,sbpl::motion::BaseGroupHeuristic::NONE);
+        state->h[1] = std::max(state->h[0],state->h[1]);
         state->f[0] = computeKey(state,sbpl::motion::GroupType::BASE);
         state->f[1] = computeKey(state,sbpl::motion::GroupType::ARM);
-        m_open_base.push(state,sbpl::motion::GroupType::BASE);
-        m_open_base_iso.push(state,sbpl::motion::GroupType::BASE_ISO);
-        m_open_arm.push(state,sbpl::motion::GroupType::ARM);
+        SMPL_INFO_STREAM("Start state with ID "<<state->state_id<<", has a heuristics "<<state->h[0]<<" & "<<state->h[1]<<" and g-val "<<state->g
+            <<" f-val "<<state->f[0]<<" & "<<state->f[1]);
+        
         state->C = 0;
         state->E = INFINITECOST;
         std::vector<int> parents(0);
@@ -908,10 +951,14 @@ void MHTRAStar::initializeStartStates()
         state->gval_hist.push_back(0);
         state->source = sbpl::motion::GroupType::ANY;
         state->bestpredstate = nullptr;
+        state->call_number = m_call_number;
+        m_open_base_iso.push(state,sbpl::motion::GroupType::BASE_ISO);
+        m_open_base.push(state,sbpl::motion::GroupType::BASE);
+        m_open_arm.push(state,sbpl::motion::GroupType::ARM);
+        
+
         if(i==0)
             start_state = state;
-
-        seen_states.push_back(state);
     }
 }
 
@@ -931,6 +978,7 @@ MHTRAState* MHTRAStar::createState(int state_id)
     ss->g = INFINITECOST;
     ss->h[0] = m_heur->GetGoalHeuristic(ss->state_id, sbpl::motion::GroupType::BASE,sbpl::motion::BaseGroupHeuristic::B1);
     ss->h[1] = m_heur->GetGoalHeuristic(ss->state_id, sbpl::motion::GroupType::ARM,sbpl::motion::BaseGroupHeuristic::NONE);
+    ss->h[1] = std::max(ss->h[0],ss->h[1]);
     ss->f[0] = ss->f[1] = INFINITECOST;
     ss->eg = INFINITECOST;
     ss->iteration_closed[0] = ss->iteration_closed[1] = 0;
@@ -940,6 +988,7 @@ MHTRAState* MHTRAStar::createState(int state_id)
     ss->incons = false;
     ss->firstExpansionStep = -1;
     ss->to_erase_parents.clear();
+
     ss->source = sbpl::motion::GroupType::ANY;
     return ss;
 }
@@ -949,11 +998,11 @@ MHTRAState* MHTRAStar::createState(int state_id)
 void MHTRAStar::reinitSearchState(MHTRAState* state)
 {
      if (state->call_number != m_call_number){
-        ROS_WARN_STREAM("in reinit state call "<<state->call_number<<","<<m_call_number);
+
         state->g = INFINITECOST;
         state->h[0] = m_heur->GetGoalHeuristic(state->state_id, sbpl::motion::GroupType::BASE,sbpl::motion::BaseGroupHeuristic::B1);
         state->h[1] = m_heur->GetGoalHeuristic(state->state_id, sbpl::motion::GroupType::ARM,sbpl::motion::BaseGroupHeuristic::NONE);
-        
+        state->h[1] = std::max(state->h[0],state->h[1]);
         state->f[0] = state->f[1] = INFINITECOST;
         state->eg = INFINITECOST;
         state->iteration_closed[0] = state->iteration_closed[1] = 0;
@@ -973,38 +1022,10 @@ void MHTRAStar::reinitSearchState(MHTRAState* state)
 void MHTRAStar::extractPath(MHTRAState* to_state, std::vector<int>& solution, int& cost) const
 {
     ROS_WARN_STREAM("Start & goal IDs "<<m_start_state_id<<","<<m_goal_state_id);
-    /*for(int i=0;i<seen_states.size();i++)
-        SMPL_INFO_STREAM("state "<<seen_states[i]->state_id<<" has E "<<seen_states[i]->E
-            <<", and source "<<seen_states[i]->source);*/
-    //forward search
-    /*MHTRAState* next_state;
-    int id = to_state->parent_hist[to_state->parent_hist.size()-1];
-    auto it = find_if(seen_states.begin(), seen_states.end(), [&id](MHTRAState* obj) {return obj->state_id == id;});
-    
-    if (it != seen_states.end())
-    {
-      // found element. it is an iterator to the first matching element.
-      // if you really need the index, you can also get it:
-      auto index = std::distance(seen_states.begin(), it);
-      next_state = seen_states[index];
-    }
-*/
-    //s->bestpredstate
     for (MHTRAState* s = to_state; s; s = s->bestpredstate) {
         
         solution.push_back(s->state_id);
-        /*id = next_state->parent_hist[next_state->parent_hist.size()-1];
-        it = find_if(seen_states.begin(), seen_states.end(), [&id](MHTRAState* obj) {return obj->state_id == id;});
-    
-        if (it != seen_states.end())
-        {
-          // found element. it is an iterator to the first matching element.
-          // if you really need the index, you can also get it:
-          auto index = std::distance(seen_states.begin(), it);
-          next_state = seen_states[index];
-        }
-*/
-        if(s && s->bestpredstate)
+        if(s && s->bestpredstate!=nullptr)
             ROS_WARN_STREAM("state "<<s->state_id<<", pred "<<s->bestpredstate->state_id);
     }
     std::reverse(solution.begin(), solution.end());
@@ -1014,17 +1035,7 @@ void MHTRAStar::extractPath(MHTRAState* to_state, std::vector<int>& solution, in
 
 bool MHTRAStar::RestoreSearchTree(int restoreStep)
 {   
-   /* if (restoreStep==1)
-    {
-        m_open_base.clear(sbpl::motion::GroupType::BASE);
-        m_open_base_iso.clear(sbpl::motion::GroupType::BASE_ISO);
-        m_open_arm.clear(sbpl::motion::GroupType::ARM);
-        m_states.clear();
-        goal_state = getSearchState(m_goal_state_id);
-        reinitSearchState(goal_state);
-        initializeStartStates();
-    }
-    else*/ if(restoreStep>0)
+    if(restoreStep>0)
     {
         m_iteration = 1;
         SMPL_INFO_STREAM("in restore seen states are "<<seen_states.size()<<" and m_states "<<m_states.size());
@@ -1035,7 +1046,7 @@ bool MHTRAStar::RestoreSearchTree(int restoreStep)
         m_states.clear();
         goal_state = getSearchState(m_goal_state_id);
         reinitSearchState(goal_state);
-
+        initializeStartStates();
         //need to clear closed
         std::vector<MHTRAState*> current_seen;
         
@@ -1045,9 +1056,13 @@ bool MHTRAStar::RestoreSearchTree(int restoreStep)
             bool addedToSeen = false;
             
             //Start states
-            if(current->state_id>0 && current->state_id<6)
+            if(current->state_id>0 && current->state_id<=m_start_states_ids.size())
             {
-                current->g = 0;
+                if(std::find(m_start_states_ids.begin(),m_start_states_ids.end(),current->state_id)==m_start_states_ids.end())
+                {
+                    SMPL_WARN_STREAM("The start state ["<<current->state_id<<"] chosen before is in collision now, skip restoring it!");
+                    continue;
+                }
                 current->C = 0;
                 std::vector<int> parents(0);
                 current->parent_hist = parents;
@@ -1063,7 +1078,7 @@ bool MHTRAStar::RestoreSearchTree(int restoreStep)
                  m_states.push_back(current);*/
             }
             
-            {    
+            
                 SMPL_INFO_STREAM("state to be restored g-val "<<current->g<<" Es are "<<current->E<<" parent hist size "<<current->parent_hist.size()
                     <<" its source "<<current->source);
                 
@@ -1072,19 +1087,22 @@ bool MHTRAStar::RestoreSearchTree(int restoreStep)
                 unsigned int parentGVal;
                 if(current->E <= restoreStep)
                 {
-                    updateParents(current,restoreStep,latestParenIdx,parentGVal, 0);
+                    updateParents(current,restoreStep,latestParenIdx,parentGVal, current->source);
                     SMPL_INFO_STREAM("Fully Restored ! "<<parentGVal);
-                    if(current->state_id > 5)
+                    if(current->state_id > m_start_states_ids.size())
+                    {
                         current->bestpredstate = seen_states[latestParenIdx];
+                        current->g  = parentGVal;
+                        current->h[0] = m_heur->GetGoalHeuristic(current->state_id, sbpl::motion::GroupType::BASE,sbpl::motion::BaseGroupHeuristic::B1);
+                        current->h[1] = m_heur->GetGoalHeuristic(current->state_id, sbpl::motion::GroupType::ARM,sbpl::motion::BaseGroupHeuristic::NONE);
+                        current->h[1] = std::max(current->h[0],current->h[1]);
+                        current->f[0] = computeKey(current,sbpl::motion::GroupType::BASE);
+                        current->f[1] = computeKey(current,sbpl::motion::GroupType::ARM);
+                    }
                     else
                         current->bestpredstate = nullptr;
                         
-                    current->g = parentGVal;
-                    current->eg  = parentGVal;
-                    current->h[0] = m_heur->GetGoalHeuristic(current->state_id, sbpl::motion::GroupType::BASE,sbpl::motion::BaseGroupHeuristic::B1);
-                    current->h[1] = m_heur->GetGoalHeuristic(current->state_id, sbpl::motion::GroupType::ARM,sbpl::motion::BaseGroupHeuristic::NONE);
-                    current->f[0] = computeKey(current,sbpl::motion::GroupType::BASE);
-                    current->f[1] = computeKey(current,sbpl::motion::GroupType::ARM);
+                    current->eg  = current->g;
                     if(current->bestpredstate)
                         ROS_WARN_STREAM("after restoring pred is "<<current->bestpredstate->state_id);
                     else
@@ -1102,22 +1120,25 @@ bool MHTRAStar::RestoreSearchTree(int restoreStep)
                 //state created only
                 else if(current->C <= restoreStep)
                 {
-                    updateParents(current,restoreStep,latestParenIdx,parentGVal,0);
                     SMPL_INFO_STREAM("State generated only! "<<current->source);
-                    if(current->state_id > 5)
+                    updateParents(current,restoreStep,latestParenIdx,parentGVal,current->source);
+                    if(current->state_id > m_start_states_ids.size())
+                    {
                         current->bestpredstate = seen_states[latestParenIdx];
+                        current->g = parentGVal;
+                        current->h[0] = m_heur->GetGoalHeuristic(current->state_id, sbpl::motion::GroupType::BASE,sbpl::motion::BaseGroupHeuristic::B1);
+                        current->h[1] = m_heur->GetGoalHeuristic(current->state_id, sbpl::motion::GroupType::ARM,sbpl::motion::BaseGroupHeuristic::NONE);
+                        current->h[1] = std::max(current->h[0],current->h[1]);
+                        current->f[0] = computeKey(current,sbpl::motion::GroupType::BASE);
+                        current->f[1] = computeKey(current,sbpl::motion::GroupType::ARM);
+                    }
                     else
                         current->bestpredstate = nullptr;
 
-                    current->g = parentGVal;
                     current->v = INFINITECOST;
-                    current->h[0] = m_heur->GetGoalHeuristic(current->state_id, sbpl::motion::GroupType::BASE,sbpl::motion::BaseGroupHeuristic::B1);
-                    current->h[1] = m_heur->GetGoalHeuristic(current->state_id, sbpl::motion::GroupType::ARM,sbpl::motion::BaseGroupHeuristic::NONE);
-                    current->f[0] = computeKey(current,sbpl::motion::GroupType::BASE);
-                    current->f[1] = computeKey(current,sbpl::motion::GroupType::ARM);
                     current->E = INFINITECOST;
                     current->eg  = INFINITECOST;
-                    //current->bestpredstate = 
+                    
                     if(!addedToSeen)
                     {
                         current_seen.push_back(current);
@@ -1165,6 +1186,7 @@ bool MHTRAStar::RestoreSearchTree(int restoreStep)
 
                     current->h[0] = m_heur->GetGoalHeuristic(current->state_id, sbpl::motion::GroupType::BASE,sbpl::motion::BaseGroupHeuristic::B1);
                     current->h[1] = m_heur->GetGoalHeuristic(current->state_id, sbpl::motion::GroupType::ARM,sbpl::motion::BaseGroupHeuristic::NONE); 
+                    current->h[1] = std::max(current->h[0],current->h[1]);
                     //current->f = computeKey(current);
                     //current->call_number = m_call_number;
                     //current->incons = false;
@@ -1186,10 +1208,9 @@ bool MHTRAStar::RestoreSearchTree(int restoreStep)
                 }*/
             }
 
-        }
         seen_states = current_seen;
         expansion_step = restoreStep+1;
-        ROS_WARN_STREAM("Restore to step "<<restoreStep<<" done with number of seen states "<<seen_states.size()
+        ROS_INFO_STREAM("Restore to step "<<restoreStep<<" done with number of seen states "<<seen_states.size()
             <<" and m_states "<<m_states.size());
     }
 
@@ -1306,12 +1327,12 @@ bool MHTRAStar::storeParent(MHTRAState* succ_state, MHTRAState* state, unsigned 
 
 void MHTRAStar::heuristicChanged()
 {   
-    
-
     bool done = false;
     std::vector<unsigned int> inconsE;
     auto now = clock::now();
     RestoreSearchTree(restore_step);
+    recomputeHeuristics();
+    reorderOpen();
     clock::duration elapsed_time = now - clock::now();
     ROS_WARN_STREAM("Restore done with time "<<to_seconds(elapsed_time));
     /*recomputeHeuristics();
@@ -1338,7 +1359,7 @@ void MHTRAStar::heuristicChanged()
             done = true;
         else 
         {
-            unsigned int newStep  = (*std::min_element(inconsE.begin(),inconsE.end())) - 1;
+            unsigned int newStep  = (*std::max_element(inconsE.begin(),inconsE.end())) - 1;
            
             RestoreSearchTree(newStep); 
         }
