@@ -57,7 +57,6 @@ TRAStar::TRAStar( DiscreteSpaceInformation* space, Heuristic* heuristic, bool bS
     m_time_params.max_expansions = 0;
     m_time_params.max_allowed_time_init = clock::duration::zero();
     m_time_params.max_allowed_time = clock::duration::zero();
-    ROS_WARN_STREAM("TRA* constructor");
 }
 
 TRAStar::~TRAStar()
@@ -210,9 +209,9 @@ int TRAStar::replan(const TimeParameters& params,std::vector<int>* solution,int*
             m_search_time_init += elapsed_time;
         }
 
-        /*if (err) {
-            break;
-        }*/
+        if (err) {
+            return !err;
+        }
         ROS_INFO_NAMED(SLOG, "Improved solution with err %i", err);
         m_satisfied_eps = m_curr_eps;
     }
@@ -551,7 +550,6 @@ void TRAStar::expand(TRAState* s)
         ROS_INFO_NAMED(SELOG, "Compare new cost %d vs old cost %d for state %i ", new_cost, succ_state->g, succ_state->state_id, s->g);
         if (new_cost < succ_state->g) {
             succ_state->g = new_cost;
-            //for forward search
             succ_state->bestpredstate = s;
             storeParent(succ_state,s,new_cost,expansion_step);
             if (succ_state->iteration_closed != m_iteration) {
@@ -653,15 +651,11 @@ TRAState* TRAStar::createState(int state_id)
 // Lazily (re)initialize a search state.
 void TRAStar::reinitSearchState(TRAState* state)
 {
-     if (state->call_number != m_call_number){// && state->C==INFINITECOST) {
-        
+     if (state->call_number != m_call_number){
+
         state->g = INFINITECOST;
         state->h = m_heur->GetGoalHeuristic(state->state_id);
-        if(state->state_id==0)
-            ROS_INFO_STREAM("Reinitialize Goal state "<< state->state_id<<" and h "<<state->h);
-        if(state->state_id==1)
-            ROS_INFO_STREAM("Reinitialize Start state "<< state->state_id<<" and h "<<state->h<<","<<m_call_number<<","<<state->call_number);
-        state->f = INFINITECOST;
+         state->f = INFINITECOST;
         state->eg = INFINITECOST;
         state->iteration_closed = 0;
         state->call_number = m_call_number;
@@ -712,8 +706,7 @@ bool TRAStar::RestoreSearchTree(int restoreStep)
         for(int i=0;i<seen_states.size();i++)
         {
             TRAState* current = seen_states[i];
-            bool addedToSeen = false;
-            
+           
             //Start states
             if(current->state_id>0 && current->state_id<=m_start_states_ids.size())
             {
@@ -760,12 +753,7 @@ bool TRAStar::RestoreSearchTree(int restoreStep)
                         ROS_WARN_STREAM("after restoring null pred");
                     //insert in closed
                     current->iteration_closed= m_iteration;
-                    if(!addedToSeen)
-                    {
-                        m_states.push_back(current);
-                        current_seen.push_back(current);
-                        addedToSeen=true;
-                    }
+                    
                 }
                 //state created only
                 else if(current->C <= restoreStep)
@@ -786,13 +774,6 @@ bool TRAStar::RestoreSearchTree(int restoreStep)
                     current->v = INFINITECOST;
                     current->E = INFINITECOST;
                     current->eg  = INFINITECOST;
-                    //current->bestpredstate = 
-                    if(!addedToSeen)
-                    {
-                        current_seen.push_back(current);
-                        m_states.push_back(current);
-                        addedToSeen = true;
-                    }
                     
                     if(current->bestpredstate)
                         ROS_WARN_STREAM("after generating pred is "<<current->bestpredstate->state_id);
@@ -909,8 +890,6 @@ bool TRAStar::storeParent(TRAState* succ_state, TRAState* state, unsigned int gV
 
 void TRAStar::heuristicChanged()
 {   
-    
-
     bool done = false;
     std::vector<unsigned int> inconsE;
 
