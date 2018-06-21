@@ -575,14 +575,110 @@ void ManipLattice::GetSuccsByGroupAndExpansion(
     }
 }
 
+bool ManipLattice::updateMultipleStartStates (std::vector<int>* new_starts, std::vector<double>* new_costs, int restore_step)
+{
+    std::vector<double> max_speed, q_inc;
+    std::vector<double> longest_dur ;
+    longest_dur.resize(m_start_states_ids.size(),0);
+    max_speed.resize(robot()->jointVariableCount(),0);
+    max_speed[0] = 0.08;
+    max_speed[1] = 0.05;
+    max_speed[2] = 0.08;
+    max_speed[3] = 0.05;
+    max_speed[4] = 0.2;
+    max_speed[5] = 0.2;
+    max_speed[6] = 0.2;
+    max_speed[7] = 0.3;
+    
+    collisionChecker()->setLastExpansionStep(-1);
+
+    for(int i=0;i<m_start_states_ids.size();i++)
+    {
+        ManipLatticeState* start_entry = m_states[m_start_states_ids[i]];
+        //if(expansion_step==1)
+        {
+            if (!collisionChecker()->isStateValid(start_entry->state, true)) {
+                auto* vis_name = "invalid_start";
+                SV_SHOW_INFO_NAMED(vis_name, collisionChecker()->getCollisionModelVisualization(start_entry->state));
+                new_starts->push_back(m_start_states_ids[i]);
+                new_costs->push_back(32767);
+                longest_dur[i] = 32767;
+                SMPL_INFO_STREAM("State "<<m_start_states_ids[i]<<" -> in collision after recomputing cost");
+                continue;
+            }
+        }
+
+        new_starts->push_back(0);//m_start_states_ids[i]);
+        q_inc.resize(robot()->jointVariableCount(),0);
+        for(int j=0;j<robot()->jointVariableCount();j++)
+        {
+            
+            q_inc[j] = start_entry->state[j] - goal().angles[j];
+            if(longest_dur[i]<(q_inc[j]/max_speed[j]))
+                longest_dur[i] = (fabs(q_inc[j])/max_speed[j]);
+
+        }
+        new_costs->push_back(longest_dur[i]*100);
+        ROS_INFO_STREAM("State ["<<i<<"] with id "<<m_start_states_ids[i]<<" has longest duration "<<longest_dur[i]);
+        q_inc.clear();
+    }
+
+    int min_idx = std::distance(longest_dur.begin(), std::min_element(longest_dur.begin(), longest_dur.end()));
+    auto* vis_name = "lowest_g";
+    ManipLatticeState* entry = m_states[m_start_states_ids[min_idx]];
+    
+    auto markers = collisionChecker()->getCollisionModelVisualization(entry->state);
+    /*for (auto& marker : markers) {
+       
+        visual::Color color;
+        color.a=1;
+        color.r=0.2;
+        color.g=0.2;
+        color.b=0.4;
+        marker.ns = vis_name + std::to_string(min_idx);
+        marker.color = color;
+    }
+    SV_SHOW_INFO_NAMED(vis_name + std::to_string(min_idx), markers); */
+    ROS_INFO_STREAM("Min g-val state is "<<min_idx+1);
+    
+     if(m_start_states_ids.empty())
+    {
+        ROS_ERROR_STREAM("Failed to find a valid start state!");
+        return false;
+    }
+
+    m_start_state_id = m_start_states_ids[0];
+    return true;
+
+}
+
+void ManipLattice::displaySelectedGoal (int goalStateID)
+{
+    m_start_state_id = goalStateID;
+    auto* vis_name = "start_config";
+    ManipLatticeState* entry = m_states[m_start_states_ids[goalStateID-1]];
+
+    auto markers = collisionChecker()->getCollisionModelVisualization(entry->state);
+    for (auto& marker : markers) {
+       
+        visual::Color color;
+        color.a=1;
+        color.g=0.2;
+        color.r=0.8;
+        marker.ns = vis_name;
+        marker.color = color;
+    }
+    SV_SHOW_INFO_NAMED(vis_name, markers); 
+
+}
 
 void ManipLattice::GetPredsByGroupAndExpansion(int state_id, std::vector<int>* preds, 
-    std::vector<int>* costs, int group, int expanion_step)
+    std::vector<int>* costs, int group, int expansion_step)
 {
     assert(state_id >= 0 && state_id < m_states.size() && "state is out of bounds");
     assert(preds && costs && "predecessor buffer is null");
     assert(m_actions && "action space is uninitialized");
-
+    
     SMPL_DEBUG_NAMED(params()->expands_log, "expanding state %d", state_id);
 
     // goal state should be absorbing
@@ -609,7 +705,7 @@ void ManipLattice::GetPredsByGroupAndExpansion(int state_id, std::vector<int>* p
 
     int goal_succ_count = 0;
 
-    collisionChecker()->setLastExpansionStep(expanion_step);
+    collisionChecker()->setLastExpansionStep(expansion_step);
 
     std::vector<Action> actions;
     ActionsWeight weights;
@@ -658,10 +754,10 @@ void ManipLattice::GetPredsByGroupAndExpansion(int state_id, std::vector<int>* p
         costs->push_back(cost(parent_entry, pred_entry, weights[i], is_goal_succ));
 
         // log predecessor details
-        SMPL_DEBUG_NAMED(params()->expands_log, "      pred: %zu", i);
+        SMPL_INFO_NAMED(params()->expands_log, "      pred: %zu", i);
         SMPL_DEBUG_NAMED(params()->expands_log, "        id: %5i", pred_state_id);
-        SMPL_DEBUG_STREAM_NAMED(params()->expands_log, "        coord: " << pred_coord);
-        SMPL_DEBUG_STREAM_NAMED(params()->expands_log, "        state: " << pred_entry->state);
+        SMPL_INFO_STREAM_NAMED(params()->expands_log, "        coord: " << pred_coord);
+        SMPL_INFO_STREAM_NAMED(params()->expands_log, "        state: " << pred_entry->state);
         SMPL_DEBUG_NAMED(params()->expands_log, "        heur: %2d", GetGoalHeuristic(pred_state_id));
         SMPL_DEBUG_NAMED(params()->expands_log, "        cost: %5d", cost(parent_entry, pred_entry, is_goal_succ));
     }
@@ -669,7 +765,7 @@ void ManipLattice::GetPredsByGroupAndExpansion(int state_id, std::vector<int>* p
     if (goal_succ_count > 0) {
         SMPL_DEBUG_NAMED(params()->expands_log, "Got %d goal successors!", goal_succ_count);
     }
-    /*ROS_ERROR_STREAM("current expansion "<<expanion_step<<" group "<<group);
+   /* ROS_ERROR_STREAM("current expansion "<<expansion_step<<" group "<<group);
     std::getchar();*/
 }
 
@@ -855,10 +951,10 @@ bool ManipLattice::projectToPose(int state_id, Eigen::Affine3d& pose)
                 Eigen::Affine3d(R);
         return true;
     }
-
+    
     std::vector<double> vpose;
     if (!computePlanningFrameFK(m_states[state_id]->state, vpose)) {
-        SMPL_DEBUG("Failed to compute fk for state %d", state_id);
+        SMPL_ERROR("Failed to compute fk for state %d", state_id);
         return false;
     }
 
@@ -867,6 +963,7 @@ bool ManipLattice::projectToPose(int state_id, Eigen::Affine3d& pose)
     pose =
             Eigen::Translation3d(vpose[0], vpose[1], vpose[2]) *
             Eigen::Affine3d(R);
+
     return true;
 }
 
@@ -876,7 +973,7 @@ bool ManipLattice::projectToBasePoint(int state_id, Eigen::Vector3d& pos)
     {   
         std::vector<double> goalConfig(robot()->jointVariableCount());
         computeBaseFrameIK(goal().tgt_off_pose,goalConfig);
-         pos[0] = goalConfig[0];
+        pos[0] = goalConfig[0];
         pos[1] = goalConfig[1];
         pos[2] = goalConfig[2];
     }
@@ -886,12 +983,12 @@ bool ManipLattice::projectToBasePoint(int state_id, Eigen::Vector3d& pos)
         pos[1] = m_states[state_id]->state[1];
         pos[2] = m_states[state_id]->state[2];*/
         std::vector<double> base;
-        m_fk_iface->computeFK(m_states[state_id]->state,"base",base);
-        //SMPL_DEBUG_STREAM("FK base "<<base[0]<<","<<base[1]<<","<<base[2]);
+        m_fk_iface->computeFK(m_states[state_id]->state,"arm_base_link_roll",base);
+        SMPL_INFO_STREAM("FK base "<<base[0]<<","<<base[1]<<","<<base[2]);
         pos[0]=base[0];
         pos[1]=base[1];
         pos[2]=base[2];
-        //SMPL_DEBUG_STREAM("FK pose "<<pos[0]<<","<<pos[1]<<","<<pos[2]<<","<<m_states[state_id]->state[3]);
+        SMPL_INFO_STREAM("FK pose "<<pos[0]<<","<<pos[1]<<","<<pos[2]<<","<<m_states[state_id]->state[3]);
         
     }  
     return true;
@@ -1057,16 +1154,22 @@ int ManipLattice::cost(
 {
 
     const int DefaultCostMultiplier = 1000;
-    /*int dx = HashEntry1->coord[0] - HashEntry2->coord[0];
+    int dx = HashEntry1->coord[0] - HashEntry2->coord[0];
     int dy = HashEntry1->coord[1] - HashEntry2->coord[1];
     double yaw = HashEntry1->coord[3];
     double heading = std::atan2(dy, dx);
     bool sideways = false;
     sideways = 0.5 * M_PI - angles::shortest_angle_dist(heading, yaw);
-    if (sideways) {
+    /*if (sideways) {
         int penalty = 2;
         return DefaultCostMultiplier * penalty;
     }*/
+
+    if(angles::shortest_angle_dist(heading, yaw)>0.1)
+    {
+        return DefaultCostMultiplier * 2;
+    }
+    
     return DefaultCostMultiplier;
 }
 
@@ -1078,16 +1181,20 @@ int ManipLattice::cost(
 {
     const int DefaultCostMultiplier = 1000;
     
-    /*int dx = HashEntry1->coord[0] - HashEntry2->coord[0];
+    int dx = HashEntry1->coord[0] - HashEntry2->coord[0];
     int dy = HashEntry1->coord[1] - HashEntry2->coord[1];
     double yaw = HashEntry1->coord[3];
     double heading = std::atan2(dy, dx);
     bool sideways = false;
     sideways = 0.5 * M_PI - angles::shortest_angle_dist(heading, yaw);
-    if (sideways) {
+   /*if (sideways) {
         int penalty = 2;
         return DefaultCostMultiplier * penalty;
     }*/
+    if(angles::shortest_angle_dist(heading, yaw)>0.1)
+    {
+        return DefaultCostMultiplier * 2;
+    }
     return DefaultCostMultiplier*actionWeight;
 }
 
@@ -1101,9 +1208,9 @@ bool ManipLattice::checkAction(const RobotState& state, const Action& action)
         //SMPL_DEBUG_STREAM_NAMED(params()->expands_log, "        " << iidx << ": " << istate);
 
         if (!robot()->checkJointLimits(istate)) {
-            SMPL_DEBUG_STREAM_NAMED(params()->expands_log, "        " << iidx << ": " << istate);
+            SMPL_INFO_STREAM_NAMED(params()->expands_log, "        " << iidx << ": " << istate);
 
-            SMPL_DEBUG_NAMED(params()->expands_log, "        -> violates joint limits");
+            SMPL_INFO_NAMED(params()->expands_log, "        -> violates joint limits");
             violation_mask |= 0x00000001;
             break;
         }
@@ -1130,9 +1237,9 @@ bool ManipLattice::checkAction(const RobotState& state, const Action& action)
 
     // check for collisions along path from parent to first waypoint
     if (!collisionChecker()->isStateToStateValid(state, action[0])) {
-        SMPL_DEBUG_STREAM_NAMED(params()->expands_log, "        "  << action[0]);
+        SMPL_INFO_STREAM_NAMED(params()->expands_log, "        "  << action[0]);
 
-        SMPL_DEBUG_NAMED(params()->expands_log, "        -> path to first waypoint in collision");
+        SMPL_INFO_NAMED(params()->expands_log, "        -> path to first waypoint in collision");
         violation_mask |= 0x00000004;
     }
 
@@ -1146,9 +1253,9 @@ bool ManipLattice::checkAction(const RobotState& state, const Action& action)
         const RobotState& curr_istate = action[j];
         if (!collisionChecker()->isStateToStateValid(prev_istate, curr_istate))
         {
-            SMPL_DEBUG_STREAM_NAMED(params()->expands_log, "        " << prev_istate);
+            SMPL_INFO_STREAM_NAMED(params()->expands_log, "        " << prev_istate);
 
-            SMPL_DEBUG_NAMED(params()->expands_log, "        -> path between waypoints %zu and %zu in collision", j - 1, j);
+            SMPL_INFO_NAMED(params()->expands_log, "        -> path between waypoints %zu and %zu in collision", j - 1, j);
             violation_mask |= 0x00000008;
             break;
         }
@@ -1440,6 +1547,7 @@ bool ManipLattice::setMultipleStart(const std::vector<RobotState>& states)
 
     m_start_state_id = getOrCreateState(virtual_start_coord, virtual_start_state);
     */
+    collisionChecker()->setLastExpansionStep(-1);
     for(int i=0;i<states.size();i++)
     {
         if ((int)states[i].size() < robot()->jointVariableCount()) {
@@ -1452,46 +1560,54 @@ bool ManipLattice::setMultipleStart(const std::vector<RobotState>& states)
         // check joint limits of starting configuration
         if (!robot()->checkJointLimits(states[i], true)) {
             SMPL_ERROR(" -> violates the joint limits");
-            return false;
+            continue;
         }
         // check if the start configuration is in collision
         if (!collisionChecker()->isStateValid(states[i], true)) {
             auto* vis_name = "invalid_start";
             SV_SHOW_INFO_NAMED(vis_name, collisionChecker()->getCollisionModelVisualization(states[i]));
             SMPL_ERROR(" -> in collision");
-            return false;
+            continue;
         }
 
-        auto* vis_name = "start_config";
-        //SV_SHOW_INFO_NAMED(vis_name, getStateVisualization(states[i], vis_name));
-
+        
         // get arm position in environment
         RobotCoord start_coord(robot()->jointVariableCount());
         stateToCoord(states[i], start_coord);
         SMPL_DEBUG_STREAM_NAMED(params()->graph_log, "  coord: " << start_coord);
         int start_state_id = getOrCreateState(start_coord, states[i]);
 
-        m_start_states_ids.push_back(start_state_id);
-
-       auto markers = collisionChecker()->getCollisionModelVisualization(states[i]);
-        for (auto& marker : markers) {
-           
-            visual::Color color;
-            color.a=1;
-            color.g=0.5;
-            color.b=0.5;
-            marker.ns = vis_name + std::to_string(i);
-            marker.color = color;
-
+        if(std::find(m_start_states_ids.begin(),m_start_states_ids.end(),start_state_id)==m_start_states_ids.end())
+        {
+            m_start_states_ids.push_back(start_state_id);
+            std::string vis_name = "start_config";
+        
+            auto markers = collisionChecker()->getCollisionModelVisualization(states[i]);
+            for (auto& marker : markers) 
+            {
+                visual::Color color;
+                
+                color.g = 0.2;
+                color.b = 0.2;
+                color.r = 0.2;
+                color.a=1;
+                marker.ns = vis_name + std::to_string(i);
+                marker.color = color;
+            }
+            SV_SHOW_INFO_NAMED(vis_name+ std::to_string(i), markers); 
         }
-        SV_SHOW_INFO_NAMED(vis_name + std::to_string(i), markers);
-       
+
     }
-    
+
+    if(m_start_states_ids.empty())
+    {
+        ROS_ERROR_STREAM("Failed to find a valid start state!");
+        return false;
+    }
+
     m_start_state_id = m_start_states_ids[0];
     
-    ROS_ERROR_STREAM("Current start ID "<<m_start_state_id);
-    // notify observers of updated start state
+     // notify observers of updated start state
     return RobotPlanningSpace::setStart(states[0]);
 }
 

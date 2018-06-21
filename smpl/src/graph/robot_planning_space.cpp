@@ -223,5 +223,15 @@ void RobotPlanningSpace::GetPredsByGroupAndExpansion(int TargetStateID, std::vec
 
 }
 
+bool RobotPlanningSpace::updateMultipleStartStates (std::vector<int>* new_starts, std::vector<double>* new_costs, int restore_step)
+{
+    return false;
+}
+
+void RobotPlanningSpace::displaySelectedGoal (int goalStateID)
+{
+    
+}
+
 } // namespace motion
 } // namespace sbpl

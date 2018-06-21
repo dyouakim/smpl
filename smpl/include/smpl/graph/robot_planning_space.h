@@ -149,6 +149,10 @@ public:
     virtual void GetPredsByGroupAndExpansion(int TargetStateID, std::vector<int>* PredIDV, 
         std::vector<int>* CostV, int group, int expanion_step) override;
 
+    virtual bool updateMultipleStartStates (std::vector<int>* new_starts, std::vector<double>* new_costs, int restore_step) override;
+
+    virtual void displaySelectedGoal (int goalStateID);
+    
     virtual void GetPreds(
         int state_id,
         std::vector<int>* preds,

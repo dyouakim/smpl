@@ -193,7 +193,9 @@ public:
         std::vector<int>* costs,  int group, int expanion_step) override;
 
     void GetPredsByGroupAndExpansion(int state_id, std::vector<int>* preds, 
-    std::vector<int>* costs, int group, int expanion_step) override;
+    std::vector<int>* costs, int group, int expansion_step) override;
+
+    bool updateMultipleStartStates (std::vector<int>* new_starts, std::vector<double>* new_costs, int restore_step) override;
 
     sbpl::motion::GroupType switchPlanningGroup(int state_id, double switchThreshold);
 
@@ -245,7 +247,7 @@ protected:
     auto makePathVisualization(const std::vector<RobotState>& path, std::vector<int> sourceGroup) 
         -> std::vector<visual::Marker>;
 
-    
+    void displaySelectedGoal (int goalStateID);
 
 private:
 
