@@ -479,7 +479,7 @@ bool ManipLatticeActionSpace::applyPredActions(const RobotState& parent, std::ve
             if( mp.group == group || mp.group == sbpl::motion::GroupType::ANY)
             { 
                 act.clear();
-               if (getAction(parent, goal_dist, start_dist, mp, act, true)) {
+               if (getAction(parent, goal_dist, start_dist, mp, act, false)) {
                 actions.insert(actions.end(), act.begin(), act.end());
                 weights.push_back(mp.weight);
                 }
@@ -491,7 +491,7 @@ bool ManipLatticeActionSpace::applyPredActions(const RobotState& parent, std::ve
     {
         for (const MotionPrimitive& prim : m_mprims) {
             act.clear();
-            if (getAction(parent, goal_dist, start_dist, prim, act, true)) {
+            if (getAction(parent, goal_dist, start_dist, prim, act, false)) {
                 actions.insert(actions.end(), act.begin(), act.end());
                 weights.push_back(prim.weight);
             }
@@ -577,21 +577,45 @@ bool ManipLatticeActionSpace::applyMotionPrimitive(
     const MotionPrimitive& mp,
     Action& action, bool isPredecessor)
 {
-     action = mp.action;
+    action = mp.action;
+    Action temp = action;
     for (size_t i = 0; i < action.size(); ++i) {
         if (action[i].size() != state.size()) {
             return false;
         }
 
-        if(isPredecessor)
+        //ROS_ERROR_STREAM("Initial action "<<action[i][0]<<","<<action[i][1]<<","<<action[i][2]);
+
+        
+        Eigen::Matrix2d worldToBody;
+        worldToBody(0,0) = cos(state[3]);//+action[i][3]);
+        worldToBody(0,1) = -sin(state[3]);//+action[i][3]);
+        worldToBody(1,0) = sin(state[3]);//+action[i][3]);
+        worldToBody(1,1) = cos(state[3]);//+action[i][3]);
+        
+        
+        Eigen::Vector2d actionInWorldFrame = worldToBody.inverse()*Eigen::Vector2d(action[i][0],action[i][1]);
+        temp[i][0] = actionInWorldFrame[0];
+        temp[i][1] = actionInWorldFrame[1];
+
+          if(isPredecessor)
             for (size_t j = 0; j < action[i].size(); ++j) {
-                action[i][j] = state[j] - action[i][j] ;
+                temp[i][j] = state[j] - temp[i][j] ;
    
             }
         else
             for (size_t j = 0; j < action[i].size(); ++j) {
-                action[i][j] = action[i][j] + state[j];
+                temp[i][j] = temp[i][j] + state[j];
+               /* if(j==0 || j==1)
+                {
+                    ROS_ERROR_STREAM("Action without transformation "<<action[i][j]+state[j]);
+                    ROS_ERROR_STREAM("Action with transformation "<<temp[i][j]);
+                }*/
+
             }
+
+        action = temp;
+
     } 
     return true;
 }
