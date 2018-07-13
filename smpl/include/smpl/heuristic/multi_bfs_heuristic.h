@@ -9,12 +9,12 @@
 #include <smpl/bfs3d/bfs3d.h>
 #include <smpl/debug/marker.h>
 #include <smpl/heuristic/robot_heuristic.h>
-
+#include <smpl/graph/manip_lattice.h>
 #include <tf/transform_listener.h>
 
 #include <tf_conversions/tf_eigen.h>
 #include <smpl/debug/visualize.h>
-
+#include <smpl/angles.h>
 namespace sbpl {
 namespace motion {
 
@@ -70,6 +70,7 @@ private:
 
     std::vector<std::unique_ptr<BFS_3D>> m_bfs;
     PointProjectionExtension* m_pp = nullptr;
+ManipLattice* m_manip = nullptr;
 
     double m_inflation_radius = 0.0;
     double m_base_inflation_radius = 0.0;
@@ -78,6 +79,7 @@ private:
     int m_goal_x = -1;
     int m_goal_y = -1;
     int m_goal_z = -1;
+    std::vector<double> goal_config;
 
     void syncGridAndBfs();
     //int getBfsCostToGoal(const BFS_3D& bfs, int x, int y, int z,GroupType planning_group) const;

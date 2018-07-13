@@ -34,6 +34,7 @@ bool MultiBfsHeuristic::init(RobotPlanningSpace* space, const OccupancyGrid* gri
     if (m_pp) {
         SMPL_INFO_NAMED(LOG, "Got Point Projection Extension!");
     }
+    m_manip = dynamic_cast<ManipLattice*> (space);
     syncGridAndBfs();
     return true;
 }
@@ -67,76 +68,93 @@ void MultiBfsHeuristic::updateGoal(const GoalConstraint& goal)
     SMPL_ERROR_NAMED(LOG, "Setting the BFS heuristic goal (%d, %d, %d)", gx, gy, gz);
     SMPL_ERROR_STREAM("Origin_arm "<<gx<<","<<gy<<","<<gz);
     
-    int listSize = ((double)(1.8/grid()->resolution()))+1;
-    std::vector<int> inputGoals(pow(listSize,3)*3);
-    std::vector<Eigen::Vector3d> centers;
-    SMPL_ERROR_STREAM("Goal Region Size "<<listSize<<" resolution "<<grid()->resolution()<<" total size "<<inputGoals.size());
-    int idx = 0;
-    int xSign = 1,ySign = 1, zSign = 1;
-    for(int i=0;i<listSize;i++)
+if(goal.angles.empty())
     {
-        for(int j=0;j<listSize;j++)
-           for(int k=0;k<listSize;k++)
-            {   
-                if(i>listSize/2)
-                    xSign = -(i-std::ceil(listSize/2));
-                else
-                    xSign = i;
-                if(j>listSize/2)
-                    ySign = -(j-std::ceil(listSize/2));
-                else
-                    ySign = j;
-                if(k>listSize/2)
-                    zSign = -(k-std::ceil(listSize/2));
-                else
-                    zSign = k;
-                inputGoals[idx]  = gx + xSign;
-                inputGoals[idx+1] = gy + ySign;
-                inputGoals[idx+2] = gz + zSign;
-                
-                Eigen::Vector3d p;
-                grid()->gridToWorld( inputGoals[idx],  inputGoals[idx+1],  inputGoals[idx+2], p.x(), p.y(), p.z());
-                centers.push_back(p);
-                idx+=3; 
-            }
+        int listSize = ((double)(1.8/grid()->resolution()))+1;
+        std::vector<int> inputGoals(pow(listSize,3)*3);
+        std::vector<Eigen::Vector3d> centers;
+        SMPL_ERROR_STREAM("Goal Region Size "<<listSize<<" resolution "<<grid()->resolution()<<" total size "<<inputGoals.size());
+        int idx = 0;
+        int xSign = 1,ySign = 1, zSign = 1;
+        for(int i=0;i<listSize;i++)
+        {
+            for(int j=0;j<listSize;j++)
+               for(int k=0;k<listSize;k++)
+                {   
+                    if(i>listSize/2)
+                        xSign = -(i-std::ceil(listSize/2));
+                    else
+                        xSign = i;
+                    if(j>listSize/2)
+                        ySign = -(j-std::ceil(listSize/2));
+                    else
+                        ySign = j;
+                    if(k>listSize/2)
+                        zSign = -(k-std::ceil(listSize/2));
+                    else
+                        zSign = k;
+                    inputGoals[idx]  = gx + xSign;
+                    inputGoals[idx+1] = gy + ySign;
+                    inputGoals[idx+2] = gz + zSign;
+                    
+                    Eigen::Vector3d p;
+                    grid()->gridToWorld( inputGoals[idx],  inputGoals[idx+1],  inputGoals[idx+2], p.x(), p.y(), p.z());
+                    centers.push_back(p);
+                    idx+=3; 
+                }
+        }
+
+        visual::Color color;
+        color.r = 238.0f / 255.0f;
+        color.g = 100.0f / 255.0f;
+        color.b = 149.0f / 255.0f;
+        color.a = 0.2f;
+        
+        SV_SHOW_INFO (visual::MakeCubesMarker(
+                centers,
+                grid()->resolution(),
+                color,
+                grid()->getReferenceFrame(),
+                "bfs_base_goals"));
+
+        int numGoals = m_bfs[GroupType::BASE]->run < std::vector<int>::iterator >(inputGoals.begin(),inputGoals.end());
+        if (!numGoals)
+        {
+            SMPL_ERROR_NAMED(LOG, "Grid Base Heuristic goal is out of BFS bounds");
+        }
+        else
+        {
+            SMPL_ERROR_STREAM("Number of base goal added "<<numGoals);
+        }
+    }
+    else
+    {
+        goal_config = goal.angles;
+
+        grid()->worldToGrid(
+                goal.angles[0], goal.angles[1], goal.angles[2],
+                base_gx, base_gy, base_gz);
+
+        SMPL_ERROR_STREAM("Base Goal :"<<goal.angles[0]<<","<<goal.angles[1]<<","<<goal.angles[2]
+            <<","<<base_gx<<","<<base_gy<<","<<base_gz);
+        
+
+        if (!m_bfs[GroupType::BASE]->inBounds(base_gx, base_gy, base_gz))
+        {
+            SMPL_ERROR_NAMED(LOG, "Base Heuristic goal is out of BFS bounds");
+        }
+
+        m_bfs[GroupType::BASE]->run(base_gx,base_gy,base_gz);
+       
     }
 
-    visual::Color color;
-    color.r = 238.0f / 255.0f;
-    color.g = 100.0f / 255.0f;
-    color.b = 149.0f / 255.0f;
-    color.a = 0.2f;
-    
-    SV_SHOW_INFO (visual::MakeCubesMarker(
-            centers,
-            grid()->resolution(),
-            color,
-            grid()->getReferenceFrame(),
-            "bfs_base_goals"));
-
-    int numGoals = m_bfs[GroupType::BASE]->run < std::vector<int>::iterator >(inputGoals.begin(),inputGoals.end());
-    
-    if (!m_bfs[GroupType::ARM]->inBounds(gx, gy, gz) || !numGoals)
+    if (!m_bfs[GroupType::ARM]->inBounds(gx, gy, gz))
     {
-        SMPL_ERROR_NAMED(LOG, "Heuristic goal is out of BFS bounds");
+        SMPL_ERROR_NAMED(LOG, "Arm Heuristic goal is out of BFS bounds");
     }
-    /*else
-    {
-        SMPL_ERROR_STREAM("Number of base goal added "<<numGoals);
-    }*/
-
+    
     m_bfs[GroupType::ARM]->run(gx, gy, gz);
-
-    /*grid()->worldToGrid(
-            goal.angles[0], goal.angles[1], goal.angles[2],
-            base_gx, base_gy, base_gz);
-
-    SMPL_ERROR_STREAM("Base Goal :"<<goal.angles[0]<<","<<goal.angles[1]<<","<<goal.angles[2]
-        <<","<<base_gx<<","<<base_gy<<","<<base_gz);
-    
-
-    m_bfs[GroupType::BASE]->run(base_gx,base_gy,base_gz);*/
-
+        
 
     if (!m_pp) {
         return ;
@@ -258,6 +276,18 @@ int MultiBfsHeuristic::GetGoalHeuristic(int state_id, int planning_group, int ba
     SMPL_DEBUG_STREAM("get heursitic for world point "<<p.x()<<","<<p.y()<<","<<p.z());
     
    int cost  = getBfsCostToGoal(*m_bfs[planning_group], dp.x(), dp.y(), dp.z());
+   if(!goal_config.empty() && m_manip!=nullptr && state_id!=0)
+   {
+    RobotState current = m_manip->extractState(state_id);
+    SMPL_DEBUG_STREAM("here in get goal heuristic initial cost "<<cost);
+    cost += fabs(angles::shortest_angle_diff(goal_config[3], current[3]));
+    SMPL_DEBUG_STREAM("cost of yaw "<<cost);
+    /*for(int i=4;i<goal_config.size();i++)
+        cost+= fabs(angles::shortest_angle_diff(goal_config[i],current[i]));*/
+   }
+   
+   SMPL_DEBUG_STREAM("here in get goal heuristic with cost "<<cost);
+
    return cost;
 }
 
