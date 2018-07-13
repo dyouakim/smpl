@@ -537,7 +537,7 @@ bool CollisionSpace::isStateValid(const motion::RobotState& state, bool verbose)
 
 bool CollisionSpace::isStateToStateValid(
     const motion::RobotState& start,
-    const motion::RobotState& finish,
+    const motion::RobotState& finish, 
     bool verbose)
 {
     const double res = 0.05;

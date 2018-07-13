@@ -188,6 +188,7 @@ private:
 
     std::vector<int> m_succs;
     std::vector<int> m_costs;
+    std::vector<int> m_clearance_cells;
 
     int m_call_number;          // for lazy reinitialization of search states
     int m_last_start_state_id;  // for lazy reinitialization of the search tree

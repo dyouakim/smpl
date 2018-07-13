@@ -61,7 +61,7 @@ public:
     /// \return Whether the state is valid
     virtual bool isStateValid(const RobotState& state, bool verbose = false) = 0;
 
-    virtual bool isStateValid(const RobotState& state, int expansion_step, bool verbose = false) = 0;
+    virtual bool isStateValid(const RobotState& state, double& distToObst, bool verbose = false) = 0;
 
     /// \brief Return whether the interpolated path between two points is valid.
     ///
@@ -78,6 +78,14 @@ public:
         const RobotState& start,
         const RobotState& finish,
         bool verbose = false) = 0;
+
+    virtual bool isStateToStateValid(
+        const sbpl::motion::RobotState& angles0,
+        const sbpl::motion::RobotState& angles1, double& distToObst, int& distToObstCells,
+        bool verbose = false) 
+    {
+
+    }
 
     /// \brief Return a linearly interpolated path between two joint states.
     ///
@@ -107,6 +115,12 @@ public:
     {
 
     }
+
+    virtual void setClearanceThreshold(double threshold)
+    {
+
+    }
+    
     ///@}
 };
 

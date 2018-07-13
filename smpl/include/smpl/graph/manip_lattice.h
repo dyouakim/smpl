@@ -180,7 +180,8 @@ public:
     void GetSuccsByGroup(
         int state_id,
         std::vector<int>* succs,
-        std::vector<int>* costs, int group) override;
+        std::vector<int>* costs, 
+        std::vector<int>* clearance_cells,int group) override;
 
     void GetSuccsWithExpansion(
         int state_id,
@@ -198,6 +199,8 @@ public:
     bool updateMultipleStartStates (std::vector<int>* new_starts, std::vector<double>* new_costs, int restore_step) override;
 
     sbpl::motion::GroupType switchPlanningGroup(int state_id, double switchThreshold);
+
+    void setMotionPlanRequestType (int request_type);
 
 protected:
 
@@ -236,6 +239,9 @@ protected:
 
     bool checkAction(const RobotState& state, const Action& action);
 
+
+    bool checkAction(const RobotState& state, const Action& action, double& distToObst, int& distToObstCells);
+
     bool isGoal(const RobotState& state);
 
     auto getStateVisualization(const RobotState& vars, const std::string& ns)
@@ -254,7 +260,7 @@ private:
     ForwardKinematicsInterface* m_fk_iface = nullptr;
     InverseKinematicsInterface* m_ik_iface = nullptr;
     ActionSpace* m_actions = nullptr;
-
+    double clearance_threshold_;
     // cached from robot model
     std::vector<double> m_min_limits;
     std::vector<double> m_max_limits;

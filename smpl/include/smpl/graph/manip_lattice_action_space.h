@@ -94,9 +94,14 @@ public:
     void useLongAndShortPrims(bool enable);
     void ampThresh(MotionPrimitive::Type type, double thresh);
 
-     /// \name Required Public Functions from ActionSpace
-    ///@{
+    void setMotionPlanRequestType (int request_type)
+    {
+        motion_plan_request_type_ = request_type;
 
+    }
+
+    /// \name Required Public Functions from ActionSpace
+    ///@{
     bool apply(const RobotState& parent, std::vector<Action>& actions);
 
     /// \name Required Public Functions from ActionSpace
@@ -150,6 +155,8 @@ protected:
         double goal_dist,
         MotionPrimitive::Type type) const;
 
+    //0 --> navigation or approaching the object, 1 --> manipulation
+    int motion_plan_request_type_;
 
      // heterogeneous comparison:
     struct MotionPrimitiveComparator

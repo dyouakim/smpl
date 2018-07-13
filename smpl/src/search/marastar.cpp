@@ -704,12 +704,13 @@ void MARAStar::expand(SearchState* s, sbpl::motion::GroupType group)
 {
     m_succs.clear();
     m_costs.clear();
+    m_clearance_cells.clear();
 
     std::vector<int> base_succs, arm_succs, base_costs, arm_costs;
 
     if(group==sbpl::motion::GroupType::BASE_ISO)
     {
-        m_space->GetSuccsByGroup(s->state_id, &m_succs, &m_costs, sbpl::motion::GroupType::BASE); 
+        m_space->GetSuccsByGroup(s->state_id, &m_succs, &m_costs, &m_clearance_cells, sbpl::motion::GroupType::BASE); 
         
      
         SMPL_DEBUG_STREAM("group "<<group<<" has "<<m_succs.size()<<" successors");
@@ -720,7 +721,10 @@ void MARAStar::expand(SearchState* s, sbpl::motion::GroupType group)
 
             SearchState* succ_state = getSearchState(succ_state_id);
             reinitSearchState(succ_state);
-
+            
+            succ_state->h[0] += m_clearance_cells[sidx];
+            succ_state->h[1] += m_clearance_cells[sidx]; 
+            
             int new_cost = s->eg + cost;
             SMPL_DEBUG_NAMED(SELOG, "Compare new cost %d vs old cost %d", new_cost, succ_state->g);
             if (new_cost < succ_state->g) {
@@ -778,7 +782,7 @@ void MARAStar::expand(SearchState* s, sbpl::motion::GroupType group)
 
     else
     {
-        m_space->GetSuccsByGroup(s->state_id, &m_succs, &m_costs, group); 
+        m_space->GetSuccsByGroup(s->state_id, &m_succs, &m_costs, &m_clearance_cells, group); 
         
      
         SMPL_DEBUG_STREAM("group "<<group<<" has "<<m_succs.size()<<" successors");
@@ -790,6 +794,8 @@ void MARAStar::expand(SearchState* s, sbpl::motion::GroupType group)
             SearchState* succ_state = getSearchState(succ_state_id);
             reinitSearchState(succ_state);
 
+            succ_state->h[0] += m_clearance_cells[sidx];
+            succ_state->h[1] += m_clearance_cells[sidx];
             int new_cost = s->eg + cost;
             SMPL_DEBUG_NAMED(SELOG, "Compare new cost %d vs old cost %d", new_cost, succ_state->g);
             if (new_cost < succ_state->g) {

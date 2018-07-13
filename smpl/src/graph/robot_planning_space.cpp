@@ -204,7 +204,7 @@ void RobotPlanningSpace::GetSuccsWithExpansion(
 void RobotPlanningSpace::GetSuccsByGroup(
         int state_id,
         std::vector<int>* succs,
-        std::vector<int>* costs, int group)
+        std::vector<int>* costs, std::vector<int>* clearance_cells, int group)
 {
     
 }

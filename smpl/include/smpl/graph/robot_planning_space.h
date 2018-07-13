@@ -134,7 +134,7 @@ public:
     virtual void GetSuccsByGroup(
         int state_id,
         std::vector<int>* succs,
-        std::vector<int>* costs, int group) override;
+        std::vector<int>* costs, std::vector<int>* clearance_cells, int group) override;
 
     virtual void GetSuccsByGroupAndExpansion(
         int state_id,
@@ -152,6 +152,11 @@ public:
     virtual bool updateMultipleStartStates (std::vector<int>* new_starts, std::vector<double>* new_costs, int restore_step) override;
 
     virtual void displaySelectedGoal (int goalStateID);
+
+    virtual void setMotionPlanRequestType (int request_type)
+    {
+        
+    }
     
     virtual void GetPreds(
         int state_id,

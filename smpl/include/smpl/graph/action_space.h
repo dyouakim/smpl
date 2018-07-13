@@ -66,6 +66,8 @@ public:
     RobotPlanningSpace* planningSpace() { return m_space; }
     const RobotPlanningSpace* planningSpace() const { return m_space; }
 
+    virtual void setMotionPlanRequestType (int request_type) = 0;
+
 private:
 
     RobotPlanningSpace* m_space = nullptr;
