@@ -852,7 +852,8 @@ void MHTRAStar::expand(MHTRAState* s, sbpl::motion::GroupType group)
 
         }
     }
-    expansion_step++;
+    if(succs.size()>0)
+        expansion_step++;
 }
 
 // Recompute heuristics for all states.
@@ -1035,7 +1036,7 @@ void MHTRAStar::extractPath(MHTRAState* to_state, std::vector<int>& solution, in
 
 bool MHTRAStar::RestoreSearchTree(int restoreStep)
 {   
-    if(restoreStep>0)
+    if(restoreStep>-1)
     {
         m_iteration = 1;
         SMPL_INFO_STREAM("in restore seen states are "<<seen_states.size()<<" and m_states "<<m_states.size());
