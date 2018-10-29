@@ -890,6 +890,9 @@ PlannerInterface::PlannerInterface(
     m_planner_factories["mhtrastar"] = MakeMHTRAStar;
     m_planner_factories["marastar"] = MakeMARAStar;
 
+    ros::NodeHandle nh;
+    motionPlanResPub_ = nh.advertise<moveit_msgs::MotionPlanResponse>("/sbpl_planner/motion_plan_response",5);
+    plannerDataPub_ = nh.advertise<moveit_msgs::PlanningData>("/sbpl_planner/planner_data",5);
     ROS_ERROR_STREAM("grid # occupied "<<m_grid->getOccupiedVoxelCount()<< " and frame "<<m_grid->getReferenceFrame()<<" and res is "<<m_grid->resolution());
     SV_SHOW_INFO_NAMED("OCCUPIED", m_grid->getOccupiedVoxelsVisualization());
 }
@@ -1014,9 +1017,15 @@ bool PlannerInterface::solve(
         const auto& point = path[pidx];
         ROS_DEBUG_STREAM_NAMED(PI_LOGGER, "  " << pidx << ": " << point);
     }
+    auto now = clock::now();
+    ROS_INFO_STREAM("just after planning the time is "<<to_seconds(now - then));
 
     postProcessPath(path);
     
+    now = clock::now();
+
+    ROS_INFO_STREAM("just after post process the time is "<<to_seconds(now - then));
+
     SV_SHOW_DEBUG_NAMED("trajectory", makePathVisualization(path));
 
     ROS_DEBUG_NAMED(PI_LOGGER, "smoothed path:");
@@ -1030,21 +1039,35 @@ bool PlannerInterface::solve(
     traj.header.seq = 0;
     traj.header.stamp = ros::Time::now();
 
-    if (!m_params.plan_output_dir.empty()) {
+    /*if (!m_params.plan_output_dir.empty()) {
         writePath(res.trajectory_start, res.trajectory);
     }
 
+    now = clock::now();
+    
+    ROS_INFO_STREAM("just after convert & write the time is "<<to_seconds(now - then));
+
     profilePath(traj);
+
+    now = clock::now();
+    
+    ROS_INFO_STREAM("just after profiling the time is "<<to_seconds(now - then));*/
 //    removeZeroDurationSegments(traj);
 
-    auto now = clock::now();
+    now = clock::now();
     //keep statistical metrics for benchmarking (expansion & epsilon...TODO change the response message to add the cost as well)
    
     res.planning_time = to_seconds(now - then);
     res.iterations = m_planner->get_n_expands();
     res.cost = m_planner->get_final_epsilon();
+    m_pspace->getPlanningData()->planningTime_ = res.planning_time;
+
     m_res = res; // record the last result
-    
+    ROS_ERROR_STREAM("Planning succeeded with planning time "<<res.planning_time);
+    moveit_msgs::PlanningData planning_data_msg;
+    convertPlanningDataToMsg(planning_data_msg);
+    plannerDataPub_.publish(planning_data_msg);
+    motionPlanResPub_.publish(m_res);
     return true;
 }
 
@@ -1097,7 +1120,7 @@ bool PlannerInterface::setMultipleStart(std::vector<moveit_msgs::RobotState>& st
     initial_positions.clear();
     initial_positions.push_back(best);*/
     if (!m_pspace->setMultipleStart(initial_positions)) {
-        ROS_ERROR("Failed to set start state");
+        ROS_ERROR("Failed to set multiple start state");
         return false;
     }
 
@@ -1344,6 +1367,12 @@ bool PlannerInterface::replan(double allowed_time, std::vector<RobotState>& path
 
     // if a path is returned, then pack it into msg form
     if (b_ret && (solution_state_ids.size() > 0)) {
+        m_pspace->getPlanningData()->numExpansions_ = m_planner->get_n_expands();
+        m_pspace->getPlanningData()->cost_ = m_sol_cost;
+        m_pspace->getPlanningData()->searchTime_ = m_planner->get_final_eps_planning_time();
+        m_pspace->getPlanningData()->finalEpsilon_ = m_planner->get_solution_eps();
+        m_pspace->getPlanningData()->pathNumStates_ = solution_state_ids.size();
+
         ROS_INFO_NAMED(PI_LOGGER, "Planning succeeded");
         ROS_INFO_NAMED(PI_LOGGER, "  Num Expansions (Initial): %d", m_planner->get_n_expands_init_solution());
         ROS_INFO_NAMED(PI_LOGGER, "  Num Expansions (Final): %d", m_planner->get_n_expands());
@@ -1355,11 +1384,13 @@ bool PlannerInterface::replan(double allowed_time, std::vector<RobotState>& path
         ROS_INFO_NAMED(PI_LOGGER, "  Solution Cost: %d", m_sol_cost);
 
         path.clear();
+        auto startTime = ros::Time::now().toSec();
         if (!m_pspace->extractPath(solution_state_ids, path)) {
             ROS_ERROR("Failed to convert state id path to joint variable path");
             return false;
         }
-
+        auto endTime = ros::Time::now().toSec();
+        m_pspace->getPlanningData()->pathExtractionTime_ = endTime - startTime;
     }
     return b_ret;
 
@@ -1393,6 +1424,12 @@ bool PlannerInterface::plan(double allowed_time, std::vector<RobotState>& path)
 
     // if a path is returned, then pack it into msg form
     if (b_ret && (solution_state_ids.size() > 0)) {
+        m_pspace->getPlanningData()->numExpansions_ = m_planner->get_n_expands();
+        m_pspace->getPlanningData()->cost_ = m_sol_cost;
+        m_pspace->getPlanningData()->searchTime_ = m_planner->get_final_eps_planning_time();
+        m_pspace->getPlanningData()->finalEpsilon_ = m_planner->get_solution_eps();
+        m_pspace->getPlanningData()->pathNumStates_ = solution_state_ids.size();
+
         ROS_INFO_NAMED(PI_LOGGER, "Planning succeeded");
         ROS_INFO_NAMED(PI_LOGGER, "  Num Expansions (Initial): %d", m_planner->get_n_expands_init_solution());
         ROS_INFO_NAMED(PI_LOGGER, "  Num Expansions (Final): %d", m_planner->get_n_expands());
@@ -1404,11 +1441,15 @@ bool PlannerInterface::plan(double allowed_time, std::vector<RobotState>& path)
         ROS_INFO_NAMED(PI_LOGGER, "  Solution Cost: %d", m_sol_cost);
 
         path.clear();
+
+        auto startTime = ros::Time::now().toSec();
         if (!m_pspace->extractPath(solution_state_ids, path)) {
             ROS_ERROR("Failed to convert state id path to joint variable path");
             return false;
         }
 
+        auto endTime = ros::Time::now().toSec();
+        m_pspace->getPlanningData()->pathExtractionTime_ = endTime - startTime;
     }
     return b_ret;
 }
@@ -1422,9 +1463,19 @@ bool PlannerInterface::planToPose(const moveit_msgs::PlanningScene& scene_msg,
     std::string heuristic_name;
     std::string space_name;
 
+    m_pspace->setMotionPlanRequestType(req.request_type);
+    
+    
     parsePlannerID(m_planner_id, space_name, heuristic_name, search_name);
+    auto then = clock::now();
+    bool result;
     if (search_name == "trastar" || search_name == "mhtrastar")
-        return planToPoseWithMultipleIK(scene_msg, req,path,res);
+    {
+        result =  planToPoseWithMultipleIK(scene_msg, req,path,res);
+        auto now = clock::now();
+        ROS_INFO_STREAM("Around plan to pose with multiple IK "<<to_seconds(now-then));
+        return result;
+    }
 
     const auto& goal_constraints_v = req.goal_constraints;
     assert(!goal_constraints_v.empty());
@@ -1433,6 +1484,7 @@ bool PlannerInterface::planToPose(const moveit_msgs::PlanningScene& scene_msg,
 
     // only acknowledge the first constraint
     const auto& goal_constraints = goal_constraints_v.front();
+    then = clock::now();
     // lastPlanRequestId_!=req.request_id &&
     if (!setGoalPosition(goal_constraints)) {
         ROS_ERROR("Failed to set goal position");
@@ -1445,12 +1497,13 @@ bool PlannerInterface::planToPose(const moveit_msgs::PlanningScene& scene_msg,
         res.error_code.val = moveit_msgs::MoveItErrorCodes::START_STATE_IN_COLLISION;
         return false;
     }
-    
     if (!plan(req.allowed_planning_time, path)) {
             ROS_ERROR("Failed to re-plan within alotted time frame (%0.2f seconds, %d expansions)", req.allowed_planning_time, m_planner->get_n_expands());
             res.error_code.val = moveit_msgs::MoveItErrorCodes::PLANNING_FAILED;
             return false;
         }
+    auto now = clock::now();
+    ROS_INFO_STREAM("Around simple plan "<<to_seconds(now-then));
     res.error_code.val = moveit_msgs::MoveItErrorCodes::SUCCESS;
     lastPlanRequestId_ = req.request_id;
     return true;
@@ -1481,14 +1534,131 @@ bool isIKSolutionValid(const planning_scene::PlanningScene *planning_scene,
     return true;
 }
 
+bool PlannerInterface::planToConfigurationWithMultipleIK(const moveit_msgs::MotionPlanRequest& req,
+        std::vector<RobotState>& path,
+        moveit_msgs::MotionPlanResponse& res)
+{
+
+    const auto& goal_constraints_v = req.goal_constraints;
+        assert(!goal_constraints_v.empty());
+
+    // only acknowledge the first constraint
+    const auto& goal_constraints = goal_constraints_v.front();
+    
+    moveit_msgs::Constraints startAsGoal;
+    sensor_msgs::JointState start = req.start_state.joint_state;
+    
+    std::vector<double> sbpl_tolerance(6, 0.0);
+    if (!extractGoalToleranceFromGoalConstraints(goal_constraints, &sbpl_tolerance[0])) {
+        ROS_WARN_NAMED(PI_LOGGER, "Failed to extract goal tolerance from goal constraints");
+        return false;
+    }
+
+
+    for (std::size_t i = 0; i < start.name.size(); ++i)
+    {
+        moveit_msgs::JointConstraint jnt;
+        startAsGoal.joint_constraints.push_back(jnt);
+        startAsGoal.joint_constraints[i].joint_name = start.name[i];
+        startAsGoal.joint_constraints[i].position = start.position[i];
+        startAsGoal.joint_constraints[i].tolerance_above = sbpl_tolerance[0];
+        startAsGoal.joint_constraints[i].tolerance_below = -sbpl_tolerance[0];
+        startAsGoal.joint_constraints[i].weight = 1.0;
+    }
+
+        
+        if (!setGoalConfiguration(startAsGoal)) {
+            ROS_ERROR("Failed to set goal position");
+            res.error_code.val = moveit_msgs::MoveItErrorCodes::GOAL_IN_COLLISION;
+            return false;
+        }
+
+    if(lastPlanRequestId_!=req.request_id)
+    {
+        ROS_INFO_STREAM("New request received with id "<<req.request_id);
+        
+        std::vector<moveit_msgs::RobotState> start_states;
+        moveit_msgs::RobotState temp_state = req.start_state;
+        for(int i=0; i<goal_constraints.joint_constraints.size();i++)
+        {
+            temp_state.joint_state.position[i] = goal_constraints.joint_constraints[i].position;
+        }
+        start_states.push_back(temp_state);
+        auto startTime = ros::Time::now();
+        if (!setMultipleStart(start_states, 0)) {
+            ROS_ERROR("Failed to set initial configuration of robot");
+            res.error_code.val = moveit_msgs::MoveItErrorCodes::START_STATE_IN_COLLISION;
+            return false;
+        }
+
+        ROS_INFO_STREAM("Setting multiple Start "<<(ros::Time::now()-startTime).toSec());
+    }
+    if(lastPlanRequestId_==req.request_id)
+    {   
+        std::map<std::vector<int>,int> added,removed;
+        added = m_grid->getAddedCells();
+        removed = m_grid->getRemovedCells(); 
+        int x = added.size();
+        int y = removed.size();
+        ROS_WARN_STREAM("Replannign with added vs. removed "<<x<<":"<<y);
+        int min_added_expansion = INT_MAX;
+        int min_removed_expansion = INT_MAX;
+        ros::Time startTime = ros::Time::now();
+        for(std::map<std::vector<int>,int>::iterator it=added.begin();it!=added.end();++it)
+        {
+            ROS_INFO_STREAM(" added with step "<<it->second);
+            if(it->second<min_added_expansion)
+            {
+                ROS_INFO_STREAM("found smaller added with old step "<<min_added_expansion<<" and new "<<it->second);
+                min_added_expansion = it->second;
+            }
+        }
+        for(std::map<std::vector<int>,int>::iterator it=removed.begin();it!=removed.end();++it)
+        {
+            ROS_INFO_STREAM("removed with step "<<it->second);
+            if(it->second<min_removed_expansion)
+            {
+                ROS_INFO_STREAM("found smaller removed with old step "<<min_removed_expansion<<" and new "<<it->second);
+               
+                min_removed_expansion = it->second;
+            }
+        }
+        int restore_step = std::min(min_added_expansion,min_removed_expansion)-1;
+
+        resetCellsMarking(restore_step);
+        
+        ROS_INFO_STREAM("Replan overhead, marking reset "<<(ros::Time::now()-startTime).toSec());
+        startTime = ros::Time::now();
+        if (!replan(req.allowed_planning_time, path, restore_step)) {
+            ROS_ERROR("Failed to re-plan within alotted time frame (%0.2f seconds, %d expansions)", req.allowed_planning_time, m_planner->get_n_expands());
+            res.error_code.val = moveit_msgs::MoveItErrorCodes::PLANNING_FAILED;
+            return false;
+        }
+
+        ROS_INFO_STREAM("Replan time "<<(ros::Time::now()-startTime).toSec());
+    }
+    else
+    {
+        ros::Time startTime = ros::Time::now();
+        if (!plan(req.allowed_planning_time, path)) {
+            ROS_ERROR("Failed to plan within alotted time frame (%0.2f seconds, %d expansions)", req.allowed_planning_time, m_planner->get_n_expands());
+            res.error_code.val = moveit_msgs::MoveItErrorCodes::PLANNING_FAILED;
+            return false;
+        }
+        ROS_INFO_STREAM("initial plan  time "<<(ros::Time::now()-startTime).toSec());
+    }
+
+    res.error_code.val = moveit_msgs::MoveItErrorCodes::SUCCESS;
+    lastPlanRequestId_ = req.request_id;
+    return true; 
+}
 
 bool PlannerInterface::planToPoseWithMultipleIK(const moveit_msgs::PlanningScene& scene_msg,
         const moveit_msgs::MotionPlanRequest& req,
         std::vector<RobotState>& path,
         moveit_msgs::MotionPlanResponse& res)
 {
-
-    const auto& goal_constraints_v = req.goal_constraints;
+   const auto& goal_constraints_v = req.goal_constraints;
     assert(!goal_constraints_v.empty());
 
     // only acknowledge the first constraint
@@ -1562,11 +1732,13 @@ bool PlannerInterface::planToPoseWithMultipleIK(const moveit_msgs::PlanningScene
             ROS_ERROR_STREAM("invalid solution!");
 
         /* Start sampling the yaw and generate 12 seeds covering different yaws */
-        std::vector<double> yawDecomposition = {0,0.52,1.0, 1.57, 2.0, 2.6, 3.14, 3.66, 4.1, 4.7, 5.2, 5.8};
+        /*std::vector<double> yawDecomposition = {0,0.52,1.0, 1.57, 2.0, 2.6, 3.14, 3.66, 4.1, 4.7, 5.2, 5.8};
         for(int i=0; i<yawDecomposition.size(); i++)
         {
             state.setToRandomPositions(joint_group);
             state.setVariablePosition(state.getVariableNames()[3], yawDecomposition[i]);
+            state.setVariablePosition(state.getVariableNames()[4], 0.0);
+            state.setVariablePosition(state.getVariableNames()[5], 0.3);
             
             result = state.setFromIK(joint_group,pose.pose,1,0.05,boost::bind(&isIKSolutionValid,planning_scene.get(), kset.empty() ? NULL : &kset, _1, _2, _3));
             moveit::core::robotStateToRobotStateMsg(state,goalAsStart);
@@ -1574,12 +1746,98 @@ bool PlannerInterface::planToPoseWithMultipleIK(const moveit_msgs::PlanningScene
             {
                 start_states.push_back(goalAsStart);
                 ROS_DEBUG_STREAM("found!");
-                ROS_INFO_STREAM(state);
+                ROS_INFO_STREAM(goalAsStart.joint_state);
             }
             else
                 ROS_ERROR_STREAM("invalid solution!");
-        }
-        
+        }*/
+        position = {12.594942856969411, 1.3451593341201171, 3.964215562061429, -2.725106337097762, -0.42, 1.195330456613803, 0.3883543689399954, -0.05614269605553983};
+        state.setVariablePositions (position);
+        moveit::core::robotStateToRobotStateMsg(state,goalAsStart);
+        start_states.push_back(goalAsStart);
+
+        /*position = {2.31622, 0.764904, 4.74129, -1.15308, 0.909369, -0.05, 0.107012, 0.24288}; 
+        //{4.07492, 0.378673, 4.74129, 3.14159, 0.909369, -0.0499901, 0.106992, 2.23138 };
+        state.setVariablePositions (position);
+        moveit::core::robotStateToRobotStateMsg(state,goalAsStart);
+        start_states.push_back(goalAsStart);
+
+        position = {2.58391, -0.958404, 4.78036, 0.740611, 0.909368, 0.119376, -0.0623746, -1.65081};
+        //{2.18927, -0.583771, 4.86344, 0.234922, 0.909365, 0.492631, -0.43563, -1.14512};
+        state.setVariablePositions (position);
+        moveit::core::robotStateToRobotStateMsg(state,goalAsStart);
+        start_states.push_back(goalAsStart);
+
+
+        position = {2.05526, -0.351524, 4.74131, -0.0268798, 0.909376, -0.0498895, 0.106891, -0.88333};
+        //{3.99882, -0.541233, 4.76421, 2.25298, 0.909369, 0.0494151, 0.00758647, 3.12};
+        state.setVariablePositions (position);
+        moveit::core::robotStateToRobotStateMsg(state,goalAsStart);
+        start_states.push_back(goalAsStart);
+
+
+        position = {3.8684, -0.543881, 4.97393, 2.25298, 0.909369, 1.17747, -1.12047, 3.12}; 
+        //{2.10853, -0.427041, 4.87433, 0.0702956, 0.909369, 0.545313, -0.488312, -0.980498};
+        state.setVariablePositions (position);
+        moveit::core::robotStateToRobotStateMsg(state,goalAsStart);
+        start_states.push_back(goalAsStart);
+
+
+        position = {3.99424, -0.477289, 4.89734, 2.32438, 0.909369, 0.661989, -0.604987, 3.0486};
+        //{3.93958, -0.542388, 4.92045, 2.25297, 0.909369, 0.789559, -0.732558, 3.12};
+        state.setVariablePositions (position);
+        moveit::core::robotStateToRobotStateMsg(state,goalAsStart);
+        start_states.push_back(goalAsStart);
+
+
+        position = {4.08847, -0.224462, 4.89258, 2.58249, 0.909369, 0.637124, -0.580122, 2.79049}; 
+        //{3.80233, -0.764837, 4.85745, 1.98273, 0.909369, 0.464231, -0.40723, -2.89293 };
+        state.setVariablePositions (position);
+        moveit::core::robotStateToRobotStateMsg(state,goalAsStart);
+        start_states.push_back(goalAsStart);
+
+        position = {4.07051, 0.295923, 4.89177, 3.08671, 0.909369, 0.632944, -0.575943, 2.28627}; 
+        //{3.821, -0.707116, 4.91116, 2.05116, 0.909367, 0.736732, -0.67973, -2.96136};
+        state.setVariablePositions (position);
+        moveit::core::robotStateToRobotStateMsg(state,goalAsStart);
+        start_states.push_back(goalAsStart);
+
+        position = {4.04888, 0.152552, 4.95648, 2.98796, 0.90937, 1.02679, -0.969788, 2.38502}; 
+        //{2.34059, -0.782995, 4.81714, 0.462571, 0.909369, 0.280429, -0.223428, -1.37277};
+        state.setVariablePositions (position);
+        moveit::core::robotStateToRobotStateMsg(state,goalAsStart);
+        start_states.push_back(goalAsStart);
+
+        position = {4.0607, 0.304645, 4.90351, 3.10169, 0.909369, 0.694864, -0.637863, 2.27129}; 
+        //{3.83826, -0.577701, 4.97669, 2.20981, 0.909369, 1.20579, -1.14879, -3.12};
+        state.setVariablePositions (position);
+        moveit::core::robotStateToRobotStateMsg(state,goalAsStart);
+        start_states.push_back(goalAsStart);
+
+        position = {4.07206, 0.375094, 4.81785, 3.14159, 0.909369, 0.283551, -0.226549, 2.23138}; 
+        //{4.07376, 0.377261, 4.80396, 3.14159, 0.909369, 0.22226, -0.165259, 2.23138 };
+        state.setVariablePositions (position);
+        moveit::core::robotStateToRobotStateMsg(state,goalAsStart);
+        start_states.push_back(goalAsStart);
+
+        position = {4.06136, 0.36138, 4.86706, 3.14159, 0.909369, 0.51, -0.452999, 2.23138};
+        //{4.07554, 0.379516, 4.77725, 3.14159, 0.909369, 0.105901, -0.0488999, 2.23138};
+        state.setVariablePositions (position);
+        moveit::core::robotStateToRobotStateMsg(state,goalAsStart);
+        start_states.push_back(goalAsStart);
+
+        position = {4.07571, 0.379729, 4.76658, 3.14159, 0.909369, 0.0597047, -0.00270319, 2.23138 };
+        //{4.07131, 0.374137, 4.82285, 3.14159, 0.909369, 0.305836, -0.248834, 2.23138 };
+        state.setVariablePositions (position);
+        moveit::core::robotStateToRobotStateMsg(state,goalAsStart);
+        start_states.push_back(goalAsStart);
+
+        position = {3.3291, 1.04329, 4.7699, -2.17522, 0.909369, 0.0740504, -0.0170489, 1.26502};
+        //{2.33859, -0.678686, 4.9503, 0.434925, 0.909369, 0.981016, -0.924015, -1.34513 };
+        state.setVariablePositions (position);
+        moveit::core::robotStateToRobotStateMsg(state,goalAsStart);
+        start_states.push_back(goalAsStart);*/
+
         /*const planning_scene::PlanningScenePtr planning_scene(new planning_scene::PlanningScene(robot_model_loader.getModel()));
 
         kinematic_constraints::KinematicConstraintSet kset(robot_model_loader.getModel());
@@ -1610,15 +1868,16 @@ bool PlannerInterface::planToPoseWithMultipleIK(const moveit_msgs::PlanningScene
         }
        
 
-        ROS_ERROR_STREAM("first  duration "<<(ros::Time::now()-startTime).toSec());
+        ROS_INFO_STREAM("Computing IK solutions "<<(ros::Time::now()-startTime).toSec());
         
+        startTime = ros::Time::now();
         if (!setMultipleStart(start_states, 0)) {
             ROS_ERROR("Failed to set initial configuration of robot");
             res.error_code.val = moveit_msgs::MoveItErrorCodes::START_STATE_IN_COLLISION;
             return false;
         }
 
-
+        ROS_INFO_STREAM("Setting multiple Start "<<(ros::Time::now()-startTime).toSec());
     }
     if(lastPlanRequestId_==req.request_id)
     {   
@@ -1630,7 +1889,7 @@ bool PlannerInterface::planToPoseWithMultipleIK(const moveit_msgs::PlanningScene
         ROS_WARN_STREAM("Replannign with added vs. removed "<<x<<":"<<y);
         int min_added_expansion = INT_MAX;
         int min_removed_expansion = INT_MAX;
-
+        ros::Time startTime = ros::Time::now();
         for(std::map<std::vector<int>,int>::iterator it=added.begin();it!=added.end();++it)
         {
             ROS_INFO_STREAM(" added with step "<<it->second);
@@ -1650,23 +1909,29 @@ bool PlannerInterface::planToPoseWithMultipleIK(const moveit_msgs::PlanningScene
                 min_removed_expansion = it->second;
             }
         }
-        int restore_step = std::min(min_added_expansion,min_removed_expansion);
+        int restore_step = std::min(min_added_expansion,min_removed_expansion)-1;
 
         resetCellsMarking(restore_step);
         
+        ROS_INFO_STREAM("Replan overhead, marking reset "<<(ros::Time::now()-startTime).toSec());
+        startTime = ros::Time::now();
         if (!replan(req.allowed_planning_time, path, restore_step)) {
             ROS_ERROR("Failed to re-plan within alotted time frame (%0.2f seconds, %d expansions)", req.allowed_planning_time, m_planner->get_n_expands());
             res.error_code.val = moveit_msgs::MoveItErrorCodes::PLANNING_FAILED;
             return false;
         }
+
+        ROS_INFO_STREAM("Replan time "<<(ros::Time::now()-startTime).toSec());
     }
     else
     {
+        ros::Time startTime = ros::Time::now();
         if (!plan(req.allowed_planning_time, path)) {
             ROS_ERROR("Failed to plan within alotted time frame (%0.2f seconds, %d expansions)", req.allowed_planning_time, m_planner->get_n_expands());
             res.error_code.val = moveit_msgs::MoveItErrorCodes::PLANNING_FAILED;
             return false;
         }
+        ROS_INFO_STREAM("initial plan  time "<<(ros::Time::now()-startTime).toSec());
     }
 
     res.error_code.val = moveit_msgs::MoveItErrorCodes::SUCCESS;
@@ -1684,13 +1949,33 @@ bool PlannerInterface::planToConfiguration(
     std::vector<RobotState>& path,
     moveit_msgs::MotionPlanResponse& res)
 {
-   
+    
+    std::string search_name;
+    std::string heuristic_name;
+    std::string space_name;
+
+    m_pspace->setMotionPlanRequestType(req.request_type);
+    
+    
+    parsePlannerID(m_planner_id, space_name, heuristic_name, search_name);
+    auto then = clock::now();
+    bool result;
+    if (search_name == "trastar" || search_name == "mhtrastar")
+    {
+        result =  planToConfigurationWithMultipleIK(req,path,res);
+        auto now = clock::now();
+        ROS_INFO_STREAM("Around plan to pose with multiple IK "<<to_seconds(now-then));
+        return result;
+    }
+
+
     const auto& goal_constraints_v = req.goal_constraints;
     assert(!goal_constraints_v.empty());
 
     // only acknowledge the first constraint
     const auto& goal_constraints = goal_constraints_v.front();
 
+    
     if (!setGoalConfiguration(goal_constraints)) {
         ROS_ERROR("Failed to set goal position");
         res.error_code.val = moveit_msgs::MoveItErrorCodes::GOAL_IN_COLLISION;
@@ -2215,6 +2500,37 @@ bool PlannerInterface::reinitPlanner(const std::string& planner_id)
     return true;
 }
 
+void PlannerInterface::convertPlanningDataToMsg(moveit_msgs::PlanningData& planning_data_msg)
+{
+    planning_data_msg.search_time = m_pspace->getPlanningData()->searchTime_;
+    planning_data_msg.path_extraction_time = m_pspace->getPlanningData()->pathExtractionTime_;
+    planning_data_msg.shortcut_time = m_pspace->getPlanningData()->shortcutTime_;
+    planning_data_msg.interpolation_time = m_pspace->getPlanningData()->interpolateTime_;
+    planning_data_msg.planning_time = m_pspace->getPlanningData()->planningTime_;
+    planning_data_msg.num_expansions = m_pspace->getPlanningData()->numExpansions_;
+    planning_data_msg.epsilon = m_pspace->getPlanningData()->finalEpsilon_;
+    planning_data_msg.cost = m_pspace->getPlanningData()->cost_;
+    planning_data_msg.path_num_states = m_pspace->getPlanningData()->pathNumStates_;
+    planning_data_msg.original_waypoints = m_pspace->getPlanningData()->originalWaypoints_;
+    planning_data_msg.interpolation_waypoints = m_pspace->getPlanningData()->interpolatedWaypoints_;
+    planning_data_msg.shortcut_waypoints = m_pspace->getPlanningData()->shortcutWaypoints_;
+    for(int i=0;i<m_pspace->getPlanningData()->actionStates_.size();i++)
+    {
+        moveit_msgs::ActionState state;
+        state.state_id = m_pspace->getPlanningData()->actionStates_[i].state_id;
+        state.parent_state_id = m_pspace->getPlanningData()->actionStates_[i].parent_id;
+        state.source_rgoup = m_pspace->getPlanningData()->actionStates_[i].source;
+        state.dist_obst_time = m_pspace->getPlanningData()->actionStates_[i].dist_collision_time;
+        state.state_config = m_pspace->getPlanningData()->actionStates_[i].state_config;
+        state.parent_state_config = m_pspace->getPlanningData()->actionStates_[i].parent_state_config;
+        state.g = m_pspace->getPlanningData()->actionStates_[i].g;
+        state.h = m_pspace->getPlanningData()->actionStates_[i].h;
+
+        planning_data_msg.action_states.push_back(state);
+    }
+
+}
+
 void PlannerInterface::profilePath(trajectory_msgs::JointTrajectory& traj) const
 {
     if (traj.points.empty()) {
@@ -2292,7 +2608,8 @@ void PlannerInterface::postProcessPath(std::vector<RobotState>& path) const
     if (check_planned_path && !isPathValid(path)) {
         ROS_ERROR("Planned path is invalid");
     }
-
+    m_pspace->getPlanningData()->originalWaypoints_ = path.size();
+    auto then = clock::now();
     // shortcut path
     if (m_params.shortcut_path) {
         if (!InterpolatePath(*m_checker, path)) {
@@ -2300,6 +2617,8 @@ void PlannerInterface::postProcessPath(std::vector<RobotState>& path) const
             std::vector<RobotState> ipath = path;
             path.clear();
             ShortcutPath(m_robot, m_checker, ipath, path, m_params.shortcut_type);
+
+   
         } else {
             std::vector<RobotState> ipath = path;
             path.clear();
@@ -2307,12 +2626,24 @@ void PlannerInterface::postProcessPath(std::vector<RobotState>& path) const
         }
     }
 
+    auto now = clock::now();
+    ROS_INFO_STREAM("just after shortcut the time is "<<to_seconds(now - then));
+    m_pspace->getPlanningData()->shortcutTime_ = to_seconds(now - then);
+    m_pspace->getPlanningData()->shortcutWaypoints_ = path.size();
+    
+    then = clock::now();
+    
     // interpolate path
     if (m_params.interpolate_path) {
         if (!InterpolatePath(*m_checker, path)) {
             ROS_WARN_NAMED(PI_LOGGER, "Failed to interpolate trajectory");
         }
     }
+
+    now = clock::now();
+    m_pspace->getPlanningData()->interpolateTime_ = to_seconds(now - then);
+    m_pspace->getPlanningData()->interpolatedWaypoints_ = path.size();
+    ROS_INFO_STREAM("just after interpolation the time is "<<to_seconds(now - then));
 }
 
 void PlannerInterface::convertJointVariablePathToJointTrajectory(

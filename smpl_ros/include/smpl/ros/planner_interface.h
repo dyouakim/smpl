@@ -46,6 +46,7 @@
 #include <moveit_msgs/PlanningScene.h>
 #include <moveit_msgs/RobotState.h>
 #include <moveit_msgs/RobotTrajectory.h>
+#include <moveit_msgs/PlanningData.h>
 #include <ros/ros.h>
 #include <sbpl/headers.h>
 #include <trajectory_msgs/JointTrajectoryPoint.h>
@@ -65,6 +66,7 @@
 #include <moveit/robot_state/conversions.h>
 #include <moveit/robot_model_loader/robot_model_loader.h>
 #include <moveit/planning_pipeline/planning_pipeline.h>
+#include <moveit_msgs/GetPositionIK.h>
 
 SBPL_CLASS_FORWARD(SBPLPlanner);
 
@@ -183,6 +185,8 @@ protected:
     moveit_msgs::MotionPlanRequest m_req;
     moveit_msgs::MotionPlanResponse m_res;
 
+    ros::Publisher motionPlanResPub_, plannerDataPub_;
+
     bool checkConstructionArgs() const;
 
     // Initialize the SBPL planner and the smpl environment
@@ -210,6 +214,10 @@ protected:
     
     bool planToPoseWithMultipleIK(const moveit_msgs::PlanningScene& scene_msg,
         const moveit_msgs::MotionPlanRequest& req,
+        std::vector<RobotState>& path,
+        moveit_msgs::MotionPlanResponse& res);
+
+    bool planToConfigurationWithMultipleIK(const moveit_msgs::MotionPlanRequest& req,
         std::vector<RobotState>& path,
         moveit_msgs::MotionPlanResponse& res);
 
@@ -254,7 +262,7 @@ protected:
         trajectory_msgs::JointTrajectory& traj) const;
     void profilePath(trajectory_msgs::JointTrajectory& traj) const;
     void removeZeroDurationSegments(trajectory_msgs::JointTrajectory& traj) const;
-
+    void convertPlanningDataToMsg(moveit_msgs::PlanningData& planning_data_msg);
     bool writePath(
         const moveit_msgs::RobotState& ref,
         const moveit_msgs::RobotTrajectory& traj) const;
