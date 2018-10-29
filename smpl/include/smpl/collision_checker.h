@@ -111,6 +111,11 @@ public:
 
     }
 
+    virtual void markGridForExpandedState(const sbpl::motion::RobotState& state,const sbpl::motion::RobotState& parent_state,int step)
+    {
+
+    }
+
     virtual void resetCellsMarking(int restore_step)
     {
 
