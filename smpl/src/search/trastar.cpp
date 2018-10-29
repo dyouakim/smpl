@@ -533,7 +533,7 @@ void TRAStar::expand(TRAState* s)
     if(s->firstExpansionStep == -1)
         s->firstExpansionStep = expansion_step;
 
-    m_space->GetPredsByGroupAndExpansion(s->state_id, &succs, &costs,-1, expansion_step);
+    //m_space->GetPredsByGroupAndExpansion(s->state_id, &succs, &costs,-1, expansion_step);
 
     ROS_INFO_NAMED(SELOG, " State %zu has %zu successors with expansion step %zu", s->state_id,succs.size(),expansion_step);
    
@@ -942,7 +942,7 @@ void TRAStar::initializeStartStates()
 {
     std::vector<int> succs;
     std::vector<int> costs;
-    m_space->GetPredsByGroupAndExpansion(-1, &succs, &costs,-1, -1);
+    //m_space->GetPredsByGroupAndExpansion(-1, &succs, &costs,-1, -1);
     int minCostIdx = std::distance(costs.begin(),std::min_element(costs.begin(),costs.end()));
     for(int i=0;i<m_start_states_ids.size();i++)
     {
