@@ -54,6 +54,7 @@ bool RobotPlanningSpace::init(
     m_robot = robot;
     m_checker = checker;
     m_params = params;
+    planning_data = new sbpl::motion::PlanningData();
     return true;
 }
 
@@ -154,6 +155,14 @@ int RobotPlanningSpace::GetGoalHeuristic(int state_id)
     return heuristic(0)->GetGoalHeuristic(state_id);
 }
 
+int RobotPlanningSpace::GetGoalHeuristic(int state_id, int planning_group, int base_heuristic_idx)
+{
+    if (numHeuristics() == 0) {
+        return 0;
+    }
+    return heuristic(0)->GetGoalHeuristic(state_id, planning_group, base_heuristic_idx);
+}
+
 int RobotPlanningSpace::GetStartHeuristic(int state_id)
 {
     if (numHeuristics() == 0) {
@@ -218,7 +227,7 @@ void RobotPlanningSpace::GetSuccsByGroupAndExpansion(
 }
 
 void RobotPlanningSpace::GetPredsByGroupAndExpansion(int TargetStateID, std::vector<int>* PredIDV, 
-    std::vector<int>* CostV, int group, int expanion_step)
+    std::vector<int>* CostV, std::vector<int>* clearance_cells, int group, int expanion_step, int parent_id)
 {
 
 }
