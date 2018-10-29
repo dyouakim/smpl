@@ -48,6 +48,9 @@
 #include <smpl/types.h>
 #include <smpl/graph/robot_planning_space_observer.h>
 #include <geometry_msgs/PoseStamped.h>
+
+#include <smpl/planning_data.h>
+
 namespace sbpl {
 namespace motion {
 
@@ -112,6 +115,9 @@ public:
     /// \name DiscreteSpaceInformation Interface Overrides
     ///@{
     virtual int GetGoalHeuristic(int state_id) override;
+    virtual int GetGoalHeuristic(int stateID, int planning_group, int base_heuristic_idx);
+
+
     virtual int GetStartHeuristic(int state_id) override;
     virtual int GetFromToHeuristic(int from_id, int to_id) override;
 
@@ -147,7 +153,7 @@ public:
         std::vector<int>* costs, int expanion_step) override;
 
     virtual void GetPredsByGroupAndExpansion(int TargetStateID, std::vector<int>* PredIDV, 
-        std::vector<int>* CostV, int group, int expanion_step) override;
+        std::vector<int>* CostV, std::vector<int>* clearance_cells, int group, int expanion_step, int parent_id) override;
 
     virtual bool updateMultipleStartStates (std::vector<int>* new_starts, std::vector<double>* new_costs, int restore_step) override;
 
@@ -158,6 +164,11 @@ public:
         
     }
     
+    virtual void setSelectedStartId (int start_id)
+    {
+
+    }
+
     virtual void GetPreds(
         int state_id,
         std::vector<int>* preds,
@@ -168,11 +179,18 @@ public:
         bool verbose,
         FILE* f = nullptr) override = 0;
 
+
+    sbpl::motion::PlanningData* getPlanningData()
+    {
+        return planning_data;
+    }
+
     ///@}
 
     //virtual void getExpandedStates(std::vector<RobotState>& states) const  = 0;
 
-    
+protected:
+    sbpl::motion::PlanningData* planning_data;    
 private:
 
     RobotModel* m_robot             = nullptr;
@@ -185,6 +203,9 @@ private:
     std::vector<RobotHeuristic*> m_heuristics;
 
     std::vector<RobotPlanningSpaceObserver*> m_obs;
+
+
+   
 
     // Make all attempts to hide the set of useless functions from
     // DiscreteSpaceInformation
