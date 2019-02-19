@@ -181,6 +181,7 @@ public:
    }
 
    void initializeStartStates();
+
 private:
 
 
@@ -230,6 +231,8 @@ private:
     double m_curr_eps;
     int m_iteration;
 
+    std::vector<int> m_clearance_cells;
+    
     int m_call_number;          // for lazy reinitialization of search states
     int m_last_start_state_id;  // for lazy reinitialization of the search tree
     int m_last_goal_state_id;   // for updating the search tree when the goal changes
@@ -255,6 +258,7 @@ private:
 
     bool costChanged;
     int restore_step;
+    int last_expanded_state_id;
 
     void convertTimeParamsToReplanParams(const TimeParameters& t,ReplanParams& r) const;
     void convertReplanParamsToTimeParams(const ReplanParams& r, TimeParameters& t);
@@ -304,6 +308,10 @@ private:
 
     // debugging
     void PrintSearchState(MHTRAState* state, FILE* fOut);
+
+
+    int getParentStateIdByExpansionStep();
+
 
 };
 

@@ -70,7 +70,7 @@ private:
 
     std::vector<std::unique_ptr<BFS_3D>> m_bfs;
     PointProjectionExtension* m_pp = nullptr;
-ManipLattice* m_manip = nullptr;
+    ManipLattice* m_manip = nullptr;
 
     double m_inflation_radius = 0.0;
     double m_base_inflation_radius = 0.0;

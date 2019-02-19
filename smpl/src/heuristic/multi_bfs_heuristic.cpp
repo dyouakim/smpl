@@ -68,7 +68,7 @@ void MultiBfsHeuristic::updateGoal(const GoalConstraint& goal)
     SMPL_ERROR_NAMED(LOG, "Setting the BFS heuristic goal (%d, %d, %d)", gx, gy, gz);
     SMPL_ERROR_STREAM("Origin_arm "<<gx<<","<<gy<<","<<gz);
     
-if(goal.angles.empty())
+    if(goal.angles.empty())
     {
         int listSize = ((double)(1.8/grid()->resolution()))+1;
         std::vector<int> inputGoals(pow(listSize,3)*3);
@@ -108,7 +108,7 @@ if(goal.angles.empty())
         color.r = 238.0f / 255.0f;
         color.g = 100.0f / 255.0f;
         color.b = 149.0f / 255.0f;
-        color.a = 0.2f;
+        color.a = 0.4f;
         
         SV_SHOW_INFO (visual::MakeCubesMarker(
                 centers,
@@ -116,6 +116,31 @@ if(goal.angles.empty())
                 color,
                 grid()->getReferenceFrame(),
                 "bfs_base_goals"));
+
+       /* color.r = 50.0f / 255.0f;
+        color.g = 200.0f / 255.0f;
+        color.b = 50.0f / 255.0f;
+        color.a = 0.2f;
+        std::vector<Eigen::Vector3d> grid_centers;
+        for(int i=-10;i<10;i++)
+        {
+            for(int j=-10;j<10;j++)
+            {
+                for(int k=1;k<6;k++)
+                {
+                    Eigen::Vector3d p;
+                    grid()->gridToWorld( gx+i,  gy+j,  gz+k, p.x(), p.y(), p.z());
+                    
+                    grid_centers.push_back(p);
+                }
+            }   
+        }
+        SV_SHOW_INFO (visual::MakeCubesMarker(
+                grid_centers,
+                grid()->resolution(),
+                color,
+                grid()->getReferenceFrame(),
+                "Grid"));*/
 
         int numGoals = m_bfs[GroupType::BASE]->run < std::vector<int>::iterator >(inputGoals.begin(),inputGoals.end());
         if (!numGoals)
@@ -130,12 +155,14 @@ if(goal.angles.empty())
     else
     {
         goal_config = goal.angles;
-
+        /*SMPL_ERROR_STREAM("Goal config is "<<goal_config[0]<<","<<goal_config[1]<<","
+            <<goal_config[2]<<","<<goal_config[3]<<","<<goal_config[4]<<","<<goal_config[5]<<","
+            <<goal_config[6]<<","<<goal_config[7]);*/
         grid()->worldToGrid(
-                goal.angles[0], goal.angles[1], goal.angles[2],
+                goal.angles[0], goal.angles[1], 5,//goal.angles[2],
                 base_gx, base_gy, base_gz);
 
-        SMPL_ERROR_STREAM("Base Goal :"<<goal.angles[0]<<","<<goal.angles[1]<<","<<goal.angles[2]
+        SMPL_ERROR_STREAM("Base Goal :"<<goal.angles[0]<<","<<goal.angles[1]<<","<<5//goal.angles[2]
             <<","<<base_gx<<","<<base_gy<<","<<base_gz);
         
 
@@ -145,7 +172,6 @@ if(goal.angles.empty())
         }
 
         m_bfs[GroupType::BASE]->run(base_gx,base_gy,base_gz);
-       
     }
 
     if (!m_bfs[GroupType::ARM]->inBounds(gx, gy, gz))
@@ -164,7 +190,6 @@ if(goal.angles.empty())
 double MultiBfsHeuristic::getMetricStartDistance(double x, double y, double z)
 {
     int start_id = planningSpace()->getStartStateID();
-
     if (!m_pp) {
         return 0.0;
     }
@@ -268,26 +293,73 @@ int MultiBfsHeuristic::GetGoalHeuristic(int state_id, int planning_group, int ba
             return 0;
         }
     }
-
+    
     Eigen::Vector3i dp;
     grid()->worldToGrid(p.x(), p.y(), p.z(), dp.x(), dp.y(), dp.z());
     SMPL_DEBUG_STREAM("Getting distance heursitic for group "<<planning_group);
     SMPL_DEBUG_STREAM("get heursitic for grid point "<<dp.x()<<","<<dp.y()<<","<<dp.z());
     SMPL_DEBUG_STREAM("get heursitic for world point "<<p.x()<<","<<p.y()<<","<<p.z());
     
-   int cost  = getBfsCostToGoal(*m_bfs[planning_group], dp.x(), dp.y(), dp.z());
+   double cost  = getBfsCostToGoal(*m_bfs[planning_group], dp.x(), dp.y(), dp.z());
+
+   
+    if (!m_pp->projectToPoint(planningSpace()->getStartStateID(), p)) {
+        return 0.0;
+    }
+
+    int sx, sy, sz;
+    grid()->worldToGrid(p.x(), p.y(), p.z(), sx, sy, sz);
+
+
+if(state_id>12)
+{
+   double start_goal_cost = getBfsCostToGoal(*m_bfs[1], sx,sy,sz);
+   double ee_cost = getBfsCostToGoal(*m_bfs[1], dp.x(), dp.y(), dp.z());
+   double distToStart = getMetricStartDistance(p.x(),p.y(),p.z());
+   SMPL_INFO_STREAM("cost "<<ee_cost<<" vs. start_goal_cost "<<start_goal_cost);
+   double cost_ratio = ee_cost/start_goal_cost;
+   double threshold = (2.0/grid()->resolution())*m_cost_per_cell;
    if(!goal_config.empty() && m_manip!=nullptr && state_id!=0)
    {
     RobotState current = m_manip->extractState(state_id);
-    SMPL_DEBUG_STREAM("here in get goal heuristic initial cost "<<cost);
-    cost += fabs(angles::shortest_angle_diff(goal_config[3], current[3]));
-    SMPL_DEBUG_STREAM("cost of yaw "<<cost);
-    /*for(int i=4;i<goal_config.size();i++)
-        cost+= fabs(angles::shortest_angle_diff(goal_config[i],current[i]));*/
-   }
-   
-   SMPL_DEBUG_STREAM("here in get goal heuristic with cost "<<cost);
+    /*SMPL_INFO_STREAM(current[0]<<","<<current[1]<<","<<current[2]<<","<<current[3]<<","<<current[14]<<","<<current[5]
+        <<","<<current[6]<<","<<current[7]);
+    SMPL_INFO_STREAM("here in get goal heuristic initial heuristic "<<cost<<" ee_cost "<<ee_cost<<", start cost "<<start_goal_cost<<" and threshold is "<<threshold<<",group "<<planning_group);
+    cost += ((ceil((fabs(angles::shortest_angle_dist(goal_config[3], current[3])))/grid()->resolution()))*m_cost_per_cell*10);
+     for(int i=4;i<goal_config.size();i++){
+            double diff_dist =  (fabs(angles::shortest_angle_dist(goal_config[i],current[i])));
+            diff_dist = ceil(diff_dist/grid()->resolution()) * m_cost_per_cell*20;
+            cost+= diff_dist;
+            SMPL_INFO_STREAM("angle ["<<i<<"] has a diff of "<<diff_dist<<" and cost "<<cost);
+        }  */
+    /*if(planning_group==0 && cost<threshold)
+    {
+        cost += ((ceil((fabs(angles::shortest_angle_dist(goal_config[3], current[3])))/grid()->resolution()))*3000);
+        SMPL_INFO_STREAM("heuristic of yaw "<<cost);
+    }
+    else if(abs(start_goal_cost-ee_cost)>threshold)//&& cost_ratio>1)*/
 
+   /* {
+        double arm_cost = 0;
+        for(int i=4;i<goal_config.size();i++){
+            double diff_dist =  (fabs(angles::shortest_angle_dist(goal_config[i],current[i])));
+            diff_dist = ceil(diff_dist/grid()->resolution())*m_cost_per_cell;// * (start_goal_cost/ee_cost)*m_cost_per_cell;
+            arm_cost += (diff_dist/ee_cost);
+            SMPL_INFO_STREAM("angle ["<<i<<"] has a diff of "<<diff_dist);
+        }
+
+        SMPL_INFO_STREAM(" penalize heuristic of arm before inflation "<<arm_cost);
+        arm_cost*=2000;
+        SMPL_INFO_STREAM(" penalize heuristic of arm after inflation "<<arm_cost);
+        cost+= arm_cost;
+        }*/
+   }
+}
+
+SMPL_INFO_STREAM("Total final heuristic Cost is "<<cost);
+//std::getchar();
+SMPL_INFO_STREAM("====================================================================");
+        
    return cost;
 }
 

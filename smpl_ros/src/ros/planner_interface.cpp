@@ -573,6 +573,7 @@ auto MakeARAStar(RobotPlanningSpace* space, RobotHeuristic* heuristic)
 auto MakeTRAStar(RobotPlanningSpace* space, RobotHeuristic* heuristic)
     -> std::unique_ptr<SBPLPlanner>
 {
+    
     const bool forward_search = true;
     auto search = make_unique<TRAStar>(space, heuristic, forward_search);
 
@@ -613,6 +614,8 @@ auto MakeTRAStar(RobotPlanningSpace* space, RobotHeuristic* heuristic)
     if (space->params()->getParam("repair_time", repair_time)) {
         search->setAllowedRepairTime(repair_time);
     }
+
+    ROS_ERROR_STREAM("in makeTRA* before return");
     return std::move(search);
 }
 
@@ -620,6 +623,7 @@ auto MakeTRAStar(RobotPlanningSpace* space, RobotHeuristic* heuristic)
 auto MakeMHTRAStar(RobotPlanningSpace* space, RobotHeuristic* heuristic)
     -> std::unique_ptr<SBPLPlanner>
 {
+    ROS_ERROR_STREAM("in makeMHTRA* start");
     const bool forward_search = true;
     auto search = make_unique<MHTRAStar>(space, heuristic, forward_search);
 
@@ -894,7 +898,8 @@ PlannerInterface::PlannerInterface(
     motionPlanResPub_ = nh.advertise<moveit_msgs::MotionPlanResponse>("/sbpl_planner/motion_plan_response",5);
     plannerDataPub_ = nh.advertise<moveit_msgs::PlanningData>("/sbpl_planner/planner_data",5);
     ROS_ERROR_STREAM("grid # occupied "<<m_grid->getOccupiedVoxelCount()<< " and frame "<<m_grid->getReferenceFrame()<<" and res is "<<m_grid->resolution());
-    SV_SHOW_INFO_NAMED("OCCUPIED", m_grid->getOccupiedVoxelsVisualization());
+    ROS_ERROR_STREAM("end of planner interface constructor");
+    //SV_SHOW_INFO_NAMED("OCCUPIED", m_grid->getOccupiedVoxelsVisualization());
 }
 
 PlannerInterface::~PlannerInterface()
@@ -913,6 +918,7 @@ bool PlannerInterface::init(const PlanningParams& params)
     ROS_INFO_NAMED(PI_LOGGER, "  Shortcut Type: %s", to_string(params.shortcut_type).c_str());
     ROS_INFO_NAMED(PI_LOGGER, "  Interpolate Path: %s", params.interpolate_path ? "true" : "false");
 
+    ROS_ERROR_STREAM("in planner interface init!");
     if (!checkConstructionArgs()) {
         return false;
     }
@@ -926,7 +932,6 @@ bool PlannerInterface::init(const PlanningParams& params)
     m_grid->setReferenceFrame(m_params.planning_frame);
 
     lastPlanRequestId_ = -1;
-
     m_initialized = true;
 
     ROS_INFO_NAMED(PI_LOGGER, "initialized arm planner interface");
@@ -958,6 +963,7 @@ bool PlannerInterface::solve(
     const moveit_msgs::MotionPlanRequest& req,
     moveit_msgs::MotionPlanResponse& res)
 {
+    ROS_ERROR_STREAM("planner interface solve call");
     clearMotionPlanResponse(req, res);
 
     if (!m_initialized) {
@@ -1413,7 +1419,6 @@ bool PlannerInterface::plan(double allowed_time, std::vector<RobotState>& path)
     m_planner->force_planning_from_scratch();
 
     // plan
-    ROS_ERROR_STREAM("before calling the real planner!");
     b_ret = m_planner->replan(allowed_time, &solution_state_ids, &m_sol_cost);
 
     // check if an empty plan was received.
@@ -1450,6 +1455,13 @@ bool PlannerInterface::plan(double allowed_time, std::vector<RobotState>& path)
 
         auto endTime = ros::Time::now().toSec();
         m_pspace->getPlanningData()->pathExtractionTime_ = endTime - startTime;
+        for(int i=0;i<solution_state_ids.size();i++)
+        {
+            SolutionStateInfo state;
+            state.state_id = solution_state_ids[i];
+            state.state_config = path[i];
+            m_pspace->getPlanningData()->solutionStates_.push_back(state);
+        }
     }
     return b_ret;
 }
@@ -1623,6 +1635,7 @@ bool PlannerInterface::planToConfigurationWithMultipleIK(const moveit_msgs::Moti
                 min_removed_expansion = it->second;
             }
         }
+
         int restore_step = std::min(min_added_expansion,min_removed_expansion)-1;
 
         resetCellsMarking(restore_step);
@@ -1708,131 +1721,148 @@ bool PlannerInterface::planToPoseWithMultipleIK(const moveit_msgs::PlanningScene
         pose.pose.position.y = primitive_pose.position.y;
         pose.pose.position.z = primitive_pose.position.z;
         pose.pose.orientation = orientation_constraint.orientation;
+        std::vector<moveit_msgs::RobotState> start_states;
         robot_model_loader::RobotModelLoader robot_model_loader("robot_description");
         robot_state::RobotState state(robot_model_loader.getModel());
-        std::vector<moveit_msgs::RobotState> start_states;
+        
         kinematic_constraints::KinematicConstraintSet kset(robot_model_loader.getModel());
         const planning_scene::PlanningScenePtr planning_scene(new planning_scene::PlanningScene(robot_model_loader.getModel()));
         planning_scene->setPlanningSceneMsg(scene_msg);
         const moveit::core::JointModelGroup* joint_group = state.getJointModelGroup(req.group_name);
         bool result = true;
-        state.setFromIK(joint_group,pose.pose,1,0.05,boost::bind(&isIKSolutionValid,planning_scene.get(), kset.empty() ? NULL : &kset, _1, _2, _3));
-        
         std::vector<double> position(8,0);
-        moveit::core::robotStateToRobotStateMsg(state,goalAsStart);
-        
-        if(result)
+       /* if(req.request_id==0)
         {
-            start_states.push_back(goalAsStart);
-            ROS_ERROR_STREAM("found!");
-            ROS_INFO_STREAM(state);
-        }
-            
-        else
-            ROS_ERROR_STREAM("invalid solution!");
-
-        /* Start sampling the yaw and generate 12 seeds covering different yaws */
-        /*std::vector<double> yawDecomposition = {0,0.52,1.0, 1.57, 2.0, 2.6, 3.14, 3.66, 4.1, 4.7, 5.2, 5.8};
-        for(int i=0; i<yawDecomposition.size(); i++)
-        {
-            state.setToRandomPositions(joint_group);
-            state.setVariablePosition(state.getVariableNames()[3], yawDecomposition[i]);
-            state.setVariablePosition(state.getVariableNames()[4], 0.0);
-            state.setVariablePosition(state.getVariableNames()[5], 0.3);
-            
-            result = state.setFromIK(joint_group,pose.pose,1,0.05,boost::bind(&isIKSolutionValid,planning_scene.get(), kset.empty() ? NULL : &kset, _1, _2, _3));
+            //position = {2.51559, 0.170909, 4.40869, -1.29945, 0.909369, 0.014292, 0.0427095, 0.389251};
+            //position = {2.05823,-0.586781,4.39388,-0.427331,0.909369, -0.05,0.10701,-0.482871};
+            //position = {2.28255,-1.33881,4.49743,0.350936,0.909373,0.405431,-0.34843,-1.26114};
+            //position = {2.22561,-0.122468,4.39388,-0.902797,0.909369,-0.05,0.107008,-0.00740517};
+            //position = {2.28,-1.32858, 4.51035,0.34442,0.909365,0.465657,-0.408656,-1.25462};
+            //position={2.11281,-0.37205,4.48744,-0.634947,0.909369, 0.359815, -0.302813, -0.275255};
+            position={14,0,5,0,0,0,0,0};
+            state.setVariablePositions (position);
             moveit::core::robotStateToRobotStateMsg(state,goalAsStart);
+            start_states.push_back(goalAsStart);
+        }
+        else
+        {
+            state.setFromIK(joint_group,pose.pose,1,0.05,boost::bind(&isIKSolutionValid,planning_scene.get(), kset.empty() ? NULL : &kset, _1, _2, _3));
+            
+           
+            moveit::core::robotStateToRobotStateMsg(state,goalAsStart);
+            
             if(result)
             {
                 start_states.push_back(goalAsStart);
-                ROS_DEBUG_STREAM("found!");
-                ROS_INFO_STREAM(goalAsStart.joint_state);
+                ROS_ERROR_STREAM("found!");
+                ROS_INFO_STREAM(state);
             }
+                
             else
                 ROS_ERROR_STREAM("invalid solution!");
-        }*/
-        position = {12.594942856969411, 1.3451593341201171, 3.964215562061429, -2.725106337097762, -0.42, 1.195330456613803, 0.3883543689399954, -0.05614269605553983};
-        state.setVariablePositions (position);
-        moveit::core::robotStateToRobotStateMsg(state,goalAsStart);
-        start_states.push_back(goalAsStart);
 
-        /*position = {2.31622, 0.764904, 4.74129, -1.15308, 0.909369, -0.05, 0.107012, 0.24288}; 
+            /* Start sampling the yaw and generate 12 seeds covering different yaws */
+          /*  std::vector<double> yawDecomposition = {0,0.52,1.0, 1.57, 2.0, 2.6, 3.14, 3.66, 4.1, 4.7, 5.2, 5.8};
+            for(int i=0; i<yawDecomposition.size(); i++)
+            {
+                state.setToRandomPositions(joint_group);
+                state.setVariablePosition(state.getVariableNames()[3], yawDecomposition[i]);
+                state.setVariablePosition(state.getVariableNames()[4], scene_msg.robot_state.joint_state.position[4]);
+                state.setVariablePosition(state.getVariableNames()[5], scene_msg.robot_state.joint_state.position[5]);
+                state.setVariablePosition(state.getVariableNames()[6], scene_msg.robot_state.joint_state.position[6]);
+                state.setVariablePosition(state.getVariableNames()[7], scene_msg.robot_state.joint_state.position[7]);
+                
+                result = state.setFromIK(joint_group,pose.pose,1,0.05,boost::bind(&isIKSolutionValid,planning_scene.get(), kset.empty() ? NULL : &kset, _1, _2, _3));
+                moveit::core::robotStateToRobotStateMsg(state,goalAsStart);
+                if(result)
+                {
+                    start_states.push_back(goalAsStart);
+                    ROS_DEBUG_STREAM("found!");
+                    ROS_INFO_STREAM(goalAsStart.joint_state);
+                }
+                else
+                    ROS_ERROR_STREAM("invalid solution!");
+            }
+        
+        }*/
+        position = {22.2282, 1.34413, 2.94735, -2.72511, -0.42, 1.03368, 0.55, -0.0561427}; 
         //{4.07492, 0.378673, 4.74129, 3.14159, 0.909369, -0.0499901, 0.106992, 2.23138 };
         state.setVariablePositions (position);
         moveit::core::robotStateToRobotStateMsg(state,goalAsStart);
         start_states.push_back(goalAsStart);
 
-        position = {2.58391, -0.958404, 4.78036, 0.740611, 0.909368, 0.119376, -0.0623746, -1.65081};
+        position = {22.2282, 1.05203,2.94525, -3.13294, -0.012599, 1.05449, 0.55, -0.0462054};
         //{2.18927, -0.583771, 4.86344, 0.234922, 0.909365, 0.492631, -0.43563, -1.14512};
         state.setVariablePositions (position);
         moveit::core::robotStateToRobotStateMsg(state,goalAsStart);
         start_states.push_back(goalAsStart);
 
 
-        position = {2.05526, -0.351524, 4.74131, -0.0268798, 0.909376, -0.0498895, 0.106891, -0.88333};
+        position = { 22.2007,1.04727, 2.97618, -3.14159, -0.00394715, 1.44, 0.164893, -0.0459056};
         //{3.99882, -0.541233, 4.76421, 2.25298, 0.909369, 0.0494151, 0.00758647, 3.12};
         state.setVariablePositions (position);
         moveit::core::robotStateToRobotStateMsg(state,goalAsStart);
         start_states.push_back(goalAsStart);
 
 
-        position = {3.8684, -0.543881, 4.97393, 2.25298, 0.909369, 1.17747, -1.12047, 3.12}; 
+        position = { 21.9207, 0.472544, 2.97324, 2.24697, 0.891375, 1.44, 0.186985, -0.00182074}; 
         //{2.10853, -0.427041, 4.87433, 0.0702956, 0.909369, 0.545313, -0.488312, -0.980498};
         state.setVariablePositions (position);
         moveit::core::robotStateToRobotStateMsg(state,goalAsStart);
         start_states.push_back(goalAsStart);
 
 
-        position = {3.99424, -0.477289, 4.89734, 2.32438, 0.909369, 0.661989, -0.604987, 3.0486};
+        position = {21.741, 0.340013, 2.94351, 1.85009, 1.28883, 1.07293,  0.55, 0.0203087};
         //{3.93958, -0.542388, 4.92045, 2.25297, 0.909369, 0.789559, -0.732558, 3.12};
         state.setVariablePositions (position);
         moveit::core::robotStateToRobotStateMsg(state,goalAsStart);
         start_states.push_back(goalAsStart);
 
 
-        position = {4.08847, -0.224462, 4.89258, 2.58249, 0.909369, 0.637124, -0.580122, 2.79049}; 
+        position = {21.5497,0.312556, 2.95421, 1.60911, 1.53, 1.15657, 0.459793, 0.0323417}; 
         //{3.80233, -0.764837, 4.85745, 1.98273, 0.909369, 0.464231, -0.40723, -2.89293 };
         state.setVariablePositions (position);
         moveit::core::robotStateToRobotStateMsg(state,goalAsStart);
         start_states.push_back(goalAsStart);
 
-        position = {4.07051, 0.295923, 4.89177, 3.08671, 0.909369, 0.632944, -0.575943, 2.28627}; 
+        //CHOSEN GOAL
+        position = {21.4878, 0.312044, 2.97466,1.60911, 1.53, 1.44, 0.176358,0.0323418}; 
         //{3.821, -0.707116, 4.91116, 2.05116, 0.909367, 0.736732, -0.67973, -2.96136};
         state.setVariablePositions (position);
         moveit::core::robotStateToRobotStateMsg(state,goalAsStart);
         start_states.push_back(goalAsStart);
 
-        position = {4.04888, 0.152552, 4.95648, 2.98796, 0.90937, 1.02679, -0.969788, 2.38502}; 
+        position = {22.2007, 1.04728, 2.97618, 3.14159, -0.00396183, 1.44, 0.164893, -0.0459061}; 
         //{2.34059, -0.782995, 4.81714, 0.462571, 0.909369, 0.280429, -0.223428, -1.37277};
         state.setVariablePositions (position);
         moveit::core::robotStateToRobotStateMsg(state,goalAsStart);
         start_states.push_back(goalAsStart);
 
-        position = {4.0607, 0.304645, 4.90351, 3.10169, 0.909369, 0.694864, -0.637863, 2.27129}; 
+        position = {22.1996, 1.01364, 2.97591, 3.09602, 0.0416018, 1.44, 0.166902, -0.0442719}; 
         //{3.83826, -0.577701, 4.97669, 2.20981, 0.909369, 1.20579, -1.14879, -3.12};
         state.setVariablePositions (position);
         moveit::core::robotStateToRobotStateMsg(state,goalAsStart);
         start_states.push_back(goalAsStart);
 
-        position = {4.07206, 0.375094, 4.81785, 3.14159, 0.909369, 0.283551, -0.226549, 2.23138}; 
+        position = {22.2007, 1.04728, 2.97618, 3.14159, -0.00396077, 1.44,0.164894, -0.045906}; 
         //{4.07376, 0.377261, 4.80396, 3.14159, 0.909369, 0.22226, -0.165259, 2.23138 };
         state.setVariablePositions (position);
         moveit::core::robotStateToRobotStateMsg(state,goalAsStart);
         start_states.push_back(goalAsStart);
 
-        position = {4.06136, 0.36138, 4.86706, 3.14159, 0.909369, 0.51, -0.452999, 2.23138};
+        position = {22.2835, 1.04566, 2.94522, 3.14159, -0.00396072, 1.05489, 0.55, -0.045906};
         //{4.07554, 0.379516, 4.77725, 3.14159, 0.909369, 0.105901, -0.0488999, 2.23138};
         state.setVariablePositions (position);
         moveit::core::robotStateToRobotStateMsg(state,goalAsStart);
         start_states.push_back(goalAsStart);
 
-        position = {4.07571, 0.379729, 4.76658, 3.14159, 0.909369, 0.0597047, -0.00270319, 2.23138 };
+        position = {22.2835, 1.04566,2.94522, 3.14159, -0.00396152, 1.05489, 0.55, -0.0459061};
         //{4.07131, 0.374137, 4.82285, 3.14159, 0.909369, 0.305836, -0.248834, 2.23138 };
         state.setVariablePositions (position);
         moveit::core::robotStateToRobotStateMsg(state,goalAsStart);
         start_states.push_back(goalAsStart);
 
-        position = {3.3291, 1.04329, 4.7699, -2.17522, 0.909369, 0.0740504, -0.0170489, 1.26502};
+        /*position = {3.3291, 1.04329, 4.7699, -2.17522, 0.909369, 0.0740504, -0.0170489, 1.26502};
         //{2.33859, -0.678686, 4.9503, 0.434925, 0.909369, 0.981016, -0.924015, -1.34513 };
         state.setVariablePositions (position);
         moveit::core::robotStateToRobotStateMsg(state,goalAsStart);
@@ -1867,7 +1897,7 @@ bool PlannerInterface::planToPoseWithMultipleIK(const moveit_msgs::PlanningScene
             return false;
         }
        
-
+        m_pspace->getPlanningData()->startStatesIKComputeTime_ = (ros::Time::now()-startTime).toSec();
         ROS_INFO_STREAM("Computing IK solutions "<<(ros::Time::now()-startTime).toSec());
         
         startTime = ros::Time::now();
@@ -1909,7 +1939,7 @@ bool PlannerInterface::planToPoseWithMultipleIK(const moveit_msgs::PlanningScene
                 min_removed_expansion = it->second;
             }
         }
-        int restore_step = std::min(min_added_expansion,min_removed_expansion)-1;
+        int restore_step = std::min(min_added_expansion,min_removed_expansion);
 
         resetCellsMarking(restore_step);
         
@@ -1960,11 +1990,11 @@ bool PlannerInterface::planToConfiguration(
     parsePlannerID(m_planner_id, space_name, heuristic_name, search_name);
     auto then = clock::now();
     bool result;
-    if (search_name == "trastar" || search_name == "mhtrastar")
+    //if (search_name == "trastar" || search_name == "mhtrastar")
     {
         result =  planToConfigurationWithMultipleIK(req,path,res);
         auto now = clock::now();
-        ROS_INFO_STREAM("Around plan to pose with multiple IK "<<to_seconds(now-then));
+        ROS_INFO_STREAM("Around plan to configuration with multiple IK "<<to_seconds(now-then));
         return result;
     }
 
@@ -2502,6 +2532,8 @@ bool PlannerInterface::reinitPlanner(const std::string& planner_id)
 
 void PlannerInterface::convertPlanningDataToMsg(moveit_msgs::PlanningData& planning_data_msg)
 {
+    planning_data_msg.start_IK_compute_time = m_pspace->getPlanningData()->startStatesIKComputeTime_;
+    planning_data_msg.restoration_time = m_pspace->getPlanningData()->restorationTime_;
     planning_data_msg.search_time = m_pspace->getPlanningData()->searchTime_;
     planning_data_msg.path_extraction_time = m_pspace->getPlanningData()->pathExtractionTime_;
     planning_data_msg.shortcut_time = m_pspace->getPlanningData()->shortcutTime_;
@@ -2510,23 +2542,37 @@ void PlannerInterface::convertPlanningDataToMsg(moveit_msgs::PlanningData& plann
     planning_data_msg.num_expansions = m_pspace->getPlanningData()->numExpansions_;
     planning_data_msg.epsilon = m_pspace->getPlanningData()->finalEpsilon_;
     planning_data_msg.cost = m_pspace->getPlanningData()->cost_;
+    planning_data_msg.restoration_step =  m_pspace->getPlanningData()->restorationStep_;
     planning_data_msg.path_num_states = m_pspace->getPlanningData()->pathNumStates_;
     planning_data_msg.original_waypoints = m_pspace->getPlanningData()->originalWaypoints_;
     planning_data_msg.interpolation_waypoints = m_pspace->getPlanningData()->interpolatedWaypoints_;
     planning_data_msg.shortcut_waypoints = m_pspace->getPlanningData()->shortcutWaypoints_;
+    //planning_data_msg.path_state_ids.resize(m_pspace->getPlanningData()->path_state_ids.size());
+    //std::copy(m_pspace->getPlanningData()->path_state_ids.begin(), m_pspace->getPlanningData()->path_state_ids.end(),planning_data_msg.path_state_ids.begin());
     for(int i=0;i<m_pspace->getPlanningData()->actionStates_.size();i++)
     {
         moveit_msgs::ActionState state;
         state.state_id = m_pspace->getPlanningData()->actionStates_[i].state_id;
+        state.expansion_step = i+1;//m_pspace->getPlanningData()->actionStates_[i].expansion_step;
         state.parent_state_id = m_pspace->getPlanningData()->actionStates_[i].parent_id;
-        state.source_rgoup = m_pspace->getPlanningData()->actionStates_[i].source;
+        state.source_group = m_pspace->getPlanningData()->actionStates_[i].source;
+        state.marking_cell_time = m_pspace->getPlanningData()->actionStates_[i].marking_cell_time;
         state.dist_obst_time = m_pspace->getPlanningData()->actionStates_[i].dist_collision_time;
+        state.dist_obstacles = m_pspace->getPlanningData()->actionStates_[i].dist_obstacles;
+        state.dist_to_goal = m_pspace->getPlanningData()->actionStates_[i].dist_to_goal;
         state.state_config = m_pspace->getPlanningData()->actionStates_[i].state_config;
         state.parent_state_config = m_pspace->getPlanningData()->actionStates_[i].parent_state_config;
         state.g = m_pspace->getPlanningData()->actionStates_[i].g;
         state.h = m_pspace->getPlanningData()->actionStates_[i].h;
 
         planning_data_msg.action_states.push_back(state);
+    }
+    for(int i=0;i<m_pspace->getPlanningData()->solutionStates_.size();i++)
+    {
+        moveit_msgs::SolutionState state;
+        state.state_id = m_pspace->getPlanningData()->solutionStates_[i].state_id;
+        state.state_config = m_pspace->getPlanningData()->solutionStates_[i].state_config;
+        planning_data_msg.solution_states.push_back(state);
     }
 
 }

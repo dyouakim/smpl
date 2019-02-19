@@ -107,9 +107,9 @@ int MARAStar::replan(
         ++m_call_number; // trigger state reinitializations
 
 
-        SMPL_ERROR_NAMED(SLOG, "Reinitialize search start");
+        SMPL_DEBUG_STREAM("Reinitialize search start");
         reinitSearchState(start_state);
-        SMPL_ERROR_NAMED(SLOG, "Reinitialize search goal");
+        SMPL_DEBUG_NAMED(SLOG, "Reinitialize search goal");
         reinitSearchState(goal_state);
 
         start_state->g = 0;
@@ -521,7 +521,7 @@ int MARAStar::improvePath(
 
                 // path to goal found
                 
-                if (min_state->f[0] >= goal_state->f[0] || min_state->f[1] >= goal_state->f[1] || min_state == goal_state) {
+                if (min_state == goal_state) {
                     SMPL_DEBUG_NAMED(SLOG, "Found path to goal");
                     return SUCCESS;
                 }
@@ -566,7 +566,7 @@ int MARAStar::improvePath(
 
                 // path to goal found
                 
-                if (min_state->f[0] >= goal_state->f[0] || min_state->f[1] >= goal_state->f[1] || min_state == goal_state) {
+                if (min_state == goal_state) {
                     SMPL_DEBUG_NAMED(SLOG, "Found path to goal");
                     return SUCCESS;
                 }
@@ -602,14 +602,14 @@ int MARAStar::improvePath(
                 "first arm "<<(min_state->f[1] >= goal_state->f[1])<<
                 ",second "<<(min_state == goal_state));
 
-            if(!m_open_arm.empty())
+            /*if(!m_open_arm.empty())
             {
                 min_state = m_open_arm.min();
 
                 SMPL_DEBUG_STREAM("Arm min state "<<min_state->state_id<<" and f-val "<<min_state->f[1]);
 
                 // path to goal found
-                if (min_state->f[1] >= goal_state->f[1] || min_state->f[0] >= goal_state->f[0] || min_state == goal_state) {
+                if (min_state == goal_state) {
                     SMPL_DEBUG_NAMED(SLOG, "Found path to goal");
                     return SUCCESS;
                 }
@@ -640,7 +640,7 @@ int MARAStar::improvePath(
             }
             SMPL_DEBUG_STREAM("arm path condition "<<(min_state->f[0] >= goal_state->f[0])<<
                 "first arm "<<(min_state->f[1] >= goal_state->f[1])<<
-                ",second "<<(min_state == goal_state));
+                ",second "<<(min_state == goal_state));*/
             empty = m_open_base.empty() || m_open_arm.empty();// || m_open_base_iso.empty();
             SMPL_DEBUG_STREAM("one full cycle done. base_iso:"<<m_open_base_iso.empty()<<",base: "<<m_open_base.empty()<<",arm:"<<m_open_arm.empty()<<" and both:"<<empty);
     }
@@ -681,6 +681,13 @@ void MARAStar::switchPlanningGroup(double current_min)
     }
     //min_heuristic_found[sbpl::motion::GroupType::BASE]<=min_heuristic_found[sbpl::motion::GroupType::ARM])
 */
+}
+
+int MARAStar::set_multiple_start(std::vector<int> start_statesID)
+{
+    m_start_state_id = start_statesID[0];
+    //m_start_states_ids.resize(start_statesID.size(),0);
+    //std::copy(start_statesID.begin(),start_statesID.end(),m_start_states_ids.begin());
 }
 
 void MARAStar::synchronizeGroupsOpenLists()
@@ -898,16 +905,17 @@ void MARAStar::reinitSearchState(SearchState* state)
     if (state->call_number != m_call_number) {
         SMPL_DEBUG_NAMED(SELOG, "Reinitialize state %d", state->state_id);
         state->g = INFINITECOST;
-        std::vector<double> h_temp(4);
+        //std::vector<double> h_temp(4);
         state->h[0] = m_heur->GetGoalHeuristic(state->state_id, sbpl::motion::GroupType::BASE,sbpl::motion::BaseGroupHeuristic::B1);
-        /*h_temp[0] = m_heur->GetGoalHeuristic(state->state_id, sbpl::motion::GroupType::BASE,sbpl::motion::BaseGroupHeuristic::B1);
+        /*h_temp[0] = m_heur->GetGoalHeuristite->state_id, sbpl::motion::GroupType::BASE,sbpl::motion::BaseGroupHeuristic::B1);
         h_temp[1] = m_heur->GetGoalHeuristic(state->state_id, sbpl::motion::GroupType::BASE,sbpl::motion::BaseGroupHeuristic::B2);
         h_temp[2] = m_heur->GetGoalHeuristic(state->state_id, sbpl::motion::GroupType::BASE,sbpl::motion::BaseGroupHeuristic::B3);
         h_temp[3] = m_heur->GetGoalHeuristic(state->state_id, sbpl::motion::GroupType::BASE,sbpl::motion::BaseGroupHeuristic::B4);
         int index = std::distance(h_temp.begin(), std::max_element(h_temp.begin(),h_temp.end()));
         state->h[0] = h_temp[index];//std::accumulate(h_temp.begin(), h_temp.end(), 0LL)/h_temp.size(); 
-        */state->h[1] = m_heur->GetGoalHeuristic(state->state_id, sbpl::motion::GroupType::ARM,sbpl::motion::BaseGroupHeuristic::NONE);
-        
+        */
+
+        state->h[1] = m_heur->GetGoalHeuristic(state->state_id, sbpl::motion::GroupType::ARM,sbpl::motion::BaseGroupHeuristic::NONE);
         state->f[0] = state->f[1] = INFINITECOST;
         state->eg = INFINITECOST;
         state->iteration_closed[0] = 0;

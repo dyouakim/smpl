@@ -74,14 +74,14 @@ bool ManipLatticeActionSpace::init(ManipLattice* space)
 
     useMultipleIkSolutions(false);
     useLongAndShortPrims(false);
-    useAmp(MotionPrimitive::SNAP_TO_XYZ, false);
-    useAmp(MotionPrimitive::SNAP_TO_RPY, false);
-    useAmp(MotionPrimitive::SNAP_TO_XYZ_RPY, false);
-    useAmp(MotionPrimitive::SHORT_DISTANCE, false);
-    ampThresh(MotionPrimitive::SNAP_TO_XYZ, 0.2);
-    ampThresh(MotionPrimitive::SNAP_TO_RPY, 0.2);
-    ampThresh(MotionPrimitive::SNAP_TO_XYZ_RPY, 0.2);
-    ampThresh(MotionPrimitive::SHORT_DISTANCE, 0.2);
+    useAmp(MotionPrimitive::SNAP_TO_XYZ, true);
+    useAmp(MotionPrimitive::SNAP_TO_RPY, true);
+    useAmp(MotionPrimitive::SNAP_TO_XYZ_RPY, true);
+    useAmp(MotionPrimitive::SHORT_DISTANCE, true);
+    ampThresh(MotionPrimitive::SNAP_TO_XYZ, 0.4);
+    ampThresh(MotionPrimitive::SNAP_TO_RPY, 0.4);
+    ampThresh(MotionPrimitive::SNAP_TO_XYZ_RPY, 0.4);
+    ampThresh(MotionPrimitive::SHORT_DISTANCE, 0.4);
     motion_plan_request_type_ = 0;
     return true;
 }
@@ -185,9 +185,9 @@ bool ManipLatticeActionSpace::load(const std::string& action_filename)
             SMPL_ERROR("No weight defiend for this MP!");
         }
         if (i < (nrows - short_mprims)) {
-            addMotionPrim(mprim, group, weight, false,true);
+            addMotionPrim(mprim, group, weight, false);
         } else {
-            addMotionPrim(mprim, group, weight, true, true);
+            addMotionPrim(mprim, group, weight, true);
         }
     }
     fclose(fCfg);
@@ -664,6 +664,9 @@ bool ManipLatticeActionSpace::mprimActive(
     double goal_dist,
     MotionPrimitive::Type type) const
 {
+
+    ROS_INFO_STREAM("Type is "<<type<<", start_dist "<<start_dist<<", goal_dist "<<goal_dist);
+    /*std::getchar();*/
    if (type == MotionPrimitive::LONG_DISTANCE) {
         if (m_use_long_and_short_dist_mprims) {
             return true;
@@ -671,16 +674,16 @@ bool ManipLatticeActionSpace::mprimActive(
         const bool near_goal =
                 goal_dist <= m_mprim_thresh[MotionPrimitive::SHORT_DISTANCE];
         const bool near_start =
-               start_dist <= m_mprim_thresh[MotionPrimitive::SHORT_DISTANCE];
-        const bool near_endpoint = near_goal || near_start;
+                start_dist <= m_mprim_thresh[MotionPrimitive::SHORT_DISTANCE];
+        const bool near_endpoint = near_goal;// || near_start;
         return !(m_mprim_enabled[MotionPrimitive::SHORT_DISTANCE] && near_endpoint);
     } else if (type == MotionPrimitive::SHORT_DISTANCE) {
         if (m_use_long_and_short_dist_mprims) {
-            return ( m_mprim_enabled[type]);
+            return m_mprim_enabled[type];
         }
         const bool near_goal = goal_dist <= m_mprim_thresh[type];
         const bool near_start = start_dist <= m_mprim_thresh[type];
-        const bool near_endpoint = near_goal || near_start;
+        const bool near_endpoint = near_goal;//|| near_start;
         return m_mprim_enabled[type] && near_endpoint;
     } else {
         return m_mprim_enabled[type] && goal_dist <= m_mprim_thresh[type];

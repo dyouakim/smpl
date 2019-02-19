@@ -53,7 +53,6 @@
 #include <smpl/types.h>
 #include <smpl/graph/robot_planning_space.h>
 #include <smpl/graph/action_space.h>
-
 namespace sbpl {
 namespace motion {
 
@@ -194,13 +193,15 @@ public:
         std::vector<int>* costs,  int group, int expanion_step) override;
 
     void GetPredsByGroupAndExpansion(int state_id, std::vector<int>* preds, 
-    std::vector<int>* costs, int group, int expansion_step) override;
+    std::vector<int>* costs, std::vector<int>* clearance_cells, int group, int expansion_step, int parent_id) override;
 
     bool updateMultipleStartStates (std::vector<int>* new_starts, std::vector<double>* new_costs, int restore_step) override;
 
     sbpl::motion::GroupType switchPlanningGroup(int state_id, double switchThreshold);
 
     void setMotionPlanRequestType (int request_type);
+
+    void setSelectedStartId (int start_id);
 
 protected:
 
@@ -261,6 +262,7 @@ private:
     InverseKinematicsInterface* m_ik_iface = nullptr;
     ActionSpace* m_actions = nullptr;
     double clearance_threshold_;
+    double dist_threshold_;
     // cached from robot model
     std::vector<double> m_min_limits;
     std::vector<double> m_max_limits;
@@ -273,6 +275,7 @@ private:
     int m_goal_state_id = -1;
     int m_start_state_id = -1;
     std::vector<int> m_start_states_ids;
+    int m_goal_unique_id;
     
     // maps from coords to stateID
     typedef ManipLatticeState StateKey;
@@ -295,6 +298,8 @@ private:
 
     auto getTargetOffsetPose(const std::vector<double>& tip_pose) const
         -> std::vector<double>;
+
+    double getDistanceToGoal(int state_id);
 
     /// \name planning
     ///@{

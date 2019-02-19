@@ -18,6 +18,7 @@
 
 #include <smpl/console/console.h>
 
+
 namespace sbpl {
 
 class MARAStar : public SBPLPlanner
@@ -111,6 +112,7 @@ public:
     double get_final_epsilon() override;
     void get_search_stats(std::vector<PlannerStats>* s) override;
     void set_initialsolution_eps(double eps) override;
+    int set_multiple_start(std::vector<int> start_statesID) override;
     ///@}
 
 private:
@@ -241,6 +243,8 @@ private:
     void switchPlanningGroup(double current_min);
 
     void synchronizeGroupsOpenLists();
+
+
 };
 
 } // namespace sbpl
