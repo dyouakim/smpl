@@ -1990,7 +1990,7 @@ bool PlannerInterface::planToConfiguration(
     parsePlannerID(m_planner_id, space_name, heuristic_name, search_name);
     auto then = clock::now();
     bool result;
-    //if (search_name == "trastar" || search_name == "mhtrastar")
+    if (search_name == "trastar" || search_name == "mhtrastar")
     {
         result =  planToConfigurationWithMultipleIK(req,path,res);
         auto now = clock::now();
