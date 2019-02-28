@@ -602,7 +602,7 @@ int MARAStar::improvePath(
                 "first arm "<<(min_state->f[1] >= goal_state->f[1])<<
                 ",second "<<(min_state == goal_state));
 
-            /*if(!m_open_arm.empty())
+            if(!m_open_arm.empty())
             {
                 min_state = m_open_arm.min();
 
@@ -640,7 +640,7 @@ int MARAStar::improvePath(
             }
             SMPL_DEBUG_STREAM("arm path condition "<<(min_state->f[0] >= goal_state->f[0])<<
                 "first arm "<<(min_state->f[1] >= goal_state->f[1])<<
-                ",second "<<(min_state == goal_state));*/
+                ",second "<<(min_state == goal_state));
             empty = m_open_base.empty() || m_open_arm.empty();// || m_open_base_iso.empty();
             SMPL_DEBUG_STREAM("one full cycle done. base_iso:"<<m_open_base_iso.empty()<<",base: "<<m_open_base.empty()<<",arm:"<<m_open_arm.empty()<<" and both:"<<empty);
     }
