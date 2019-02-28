@@ -13,13 +13,6 @@
 #include <smpl/heuristic/attractor_heuristic.h>
 #include <smpl/heuristic/joint_dist_heuristic.h>
 
-#include <smpl/heuristic/euclid_dist_heuristic.h>
-#include <smpl/occupancy_grid.h>
-#include <smpl/robot_model.h>
-#include <smpl/search/arastar.h>
-#include <smpl/search/traplanner.h>
-#include <smpl_test/moveObstacle.h>
-
 namespace smpl = sbpl::motion;
 
 template <class CharT, class Traits = std::char_traits<CharT>>
@@ -119,10 +112,6 @@ public:
     }
     ///@}
 
-    void changeOccupancyGrid(sbpl::OccupancyGrid* grid)
-    {
-            m_grid = grid;
-    }
     /// \name Required Functions from CollisionChecker
     ///@{
     bool isStateValid(const smpl::RobotState& state, bool verbose) override;
@@ -207,39 +196,30 @@ bool GridCollisionChecker::interpolatePath(
 }
 
 /// Add a simple box obstacle in the center of the grid
-void SetupOccupancyGrid(sbpl::OccupancyGrid& grid, int xStart, int xEnd, int yIndex)
+void SetupOccupancyGrid(sbpl::OccupancyGrid& grid)
 {
     const int x_count = grid.numCellsX();
     const int y_count = grid.numCellsY();
     const int z_count = grid.numCellsZ();
 
-    //ROS_ERROR_STREAM((y_count>>1));
-    
     std::vector<Eigen::Vector3d> points;
 
     // add horizontal strip down the middle, with holes on the ends
-    for (int gx = 0; gx <= x_count - 1; ++gx) 
-    {
+    for (int gx = 1; gx < x_count - 1; ++gx) {
         double cx, cy, cz;
-        if(gx>=xStart && gx<=xEnd)
-        {
-            grid.gridToWorld(gx, yIndex >> 1, 0, cx, cy, cz);
-            points.emplace_back(cx, cy, cz);
-                
-            grid.gridToWorld(gx, (yIndex >> 1) - 1, 0, cx, cy, cz);
-            points.emplace_back(cx, cy, cz);
-        }
-        /*else
-        {
-            grid.gridToWorld(gx, (ySize >> 1) - 1, 0, cx, cy, cz);
-            points.emplace_back(cx, cy, cz);
-        }*/
+        grid.gridToWorld(gx, y_count >> 1, 0, cx, cy, cz);
+        points.emplace_back(cx, cy, cz);
+
+        grid.gridToWorld(gx, (y_count >> 1) + 1, 0, cx, cy, cz);
+        points.emplace_back(cx, cy, cz);
+
+        grid.gridToWorld(gx, (y_count >> 1) - 1, 0, cx, cy, cz);
+        points.emplace_back(cx, cy, cz);
     }
 
     SMPL_INFO("Add %zu points to grid", points.size());
     grid.addPointsToField(points);
 }
-
 
 void PrintGrid(std::ostream& o, sbpl::OccupancyGrid& grid)
 {
@@ -257,20 +237,6 @@ void PrintGrid(std::ostream& o, sbpl::OccupancyGrid& grid)
         o << '|';
         COLOR(o, sbpl::console::reset);
         for (int x = 0; x < grid.numCellsX(); ++x) {
-            double d = grid.getDistance(x, y, 0);
-            
-            /*if((grid.sizeX()-sX)/grid.resolution()==x && ((int)((grid.sizeY()-sY)/grid.resolution()))==y)
-                o<<"-1 ";
-            else if((grid.sizeX()-gX)/grid.resolution()==x && ((int)((grid.sizeY()-gY)/grid.resolution()))==y)
-            {
-                ROS_ERROR("Goal");
-                o<<"2 ";
-            }
-            else */if (d <= 0) {
-                o << "1 ";
-            } 
-            else {
-                o << "0 ";
             if (grid.getDistance(x, y, 0) <= 0) {
                 COLOR(o, sbpl::console::red);
                 o << "X";
@@ -293,49 +259,6 @@ void PrintGrid(std::ostream& o, sbpl::OccupancyGrid& grid)
     o << '+';
     COLOR(o, sbpl::console::reset);
     o << '\n';
-}
-}
-
-void PrintPath(std::ostream& o, sbpl::OccupancyGrid& grid, std::vector<smpl::RobotState> path)
-{
-    std::vector<int> pathX;
-    std::vector<int> pathY;
-
-    for(int i=0;i<path.size();i++)
-    {
-        smpl::RobotState state = path[i]; 
-        pathX.push_back((int)((state[0])/grid.resolution()));
-        pathY.push_back((int)((state[1])/grid.resolution()));
-    }
-    for (int y = grid.numCellsY() - 1; y >= 0; --y) 
-    {
-        for (int x = 0; x < grid.numCellsX(); ++x) 
-        {
-            double d = grid.getDistance(x, y, 0);
-            bool flag = false;
-            for(int i=0;i<pathX.size();i++)
-            {
-                if(x==pathX[i] && y==pathY[i])
-                {
-                   // ROS_ERROR_STREAM("Path X Y"<<pathX[i]<<","<<pathY[i]);
-               
-                    flag = true;
-                    o<<i<<" ";
-                }
-                
-            } 
-            if(!flag)
-                if (d <= 0 ) 
-                {
-                    o << "1 ";
-                }    
-                else 
-                {
-                    o << "0 ";
-                }
-        }
-        o << '\n';
-    }
 }
 
 void PrintActionSpace(const smpl::ManipLatticeActionSpace& aspace)
@@ -424,33 +347,8 @@ void PrintSolution(
     o << '\n';
 }
 
-bool moveObstacle(
-        smpl_test::moveObstacle::Request &req,
-        smpl_test::moveObstacle::Response &res) 
-{
-    ROS_ERROR("Here in the service");
-    //search->force_planning_from_scratch_and_free_memory();
-}
-
 int main(int argc, char* argv[])
 {
-
-    ros::init(argc, argv, "xytheta");
-    
-    ros::NodeHandle nh;
-    ros::NodeHandle ph("~");
-
-
-    ros::ServiceServer moveObstacleSrv = nh.advertiseService("/moveObstacle", &moveObstacle);
-
-    // 1. Instantiate Robot Model
-    KinematicVehicleModel robot_model;
-
-    // 2. Instantiate the Environment
-    const double grid_res = 0.1;
-    const double world_size_x = 0.8;
-    const double world_size_y = 0.8;
-
     if (argc < 2) {
         printf("Usage: xytheta <mprim filepath>\n");
         return 1;
@@ -468,35 +366,26 @@ int main(int argc, char* argv[])
     const double grid_res = res;
     const double world_size_x = 50.0;
     const double world_size_y = 50.0;
-
     const double world_size_z = 1.5 * grid_res;
     const double world_origin_x = 0.0;
     const double world_origin_y = 0.0;
     const double world_origin_z = 0.0;
     const double max_distance_m = 4.0;
     const bool ref_count = false;
-    sbpl::OccupancyGrid* grid = new sbpl::OccupancyGrid(
+    sbpl::OccupancyGrid grid(
             world_size_x, world_size_y, world_size_z,
             grid_res,
             world_origin_x, world_origin_y, world_origin_z,
             max_distance_m,
             ref_count);
-   
+    SetupOccupancyGrid(grid);
+    PrintGrid(std::cout, grid);
 
-    GridCollisionChecker cc(grid);
     // 3. Create Collision Checker
     GridCollisionChecker cc(&grid);
 
     // 4. Define Parameters
     smpl::PlanningParams params;
-    // 4. Instantiate Planning Space
-    auto pspace =
-            std::make_shared<smpl::ManipLattice>(&robot_model, &cc, &params);
-
-    //        auto pspace = std::make_shared<WorkspaceLattice>(&robot_model, &cc, &paramss);
-
-    if (!pspace->init({ 0.02, 0.02 })) {
-        ROS_ERROR("Failed to initialize Manip Lattice");
 
     // 5. Create Action Space
     smpl::ManipLatticeActionSpace actions;
@@ -522,17 +411,6 @@ int main(int argc, char* argv[])
         return 1;
     }
 
-    auto aspace = std::make_shared<smpl::ManipLatticeActionSpace>(pspace.get());
-    
-    if (!aspace->load(mprim_path)) {
-        return 1;
-    }
-    PrintActionSpace(*aspace);
-    // 6. Associate Action Space with Planning Space
-    pspace->setActionSpace(aspace);
-
-    // 7. Instantiate Heuristic
-    auto h = std::make_shared<smpl::JointDistHeuristic>(pspace, grid);
     // load primitives from file, whose path is stored on the param server
     if (!actions.load(mprim_path)) {
         return 1;
@@ -549,12 +427,8 @@ int main(int argc, char* argv[])
     // 10. Associate Heuristic with Planning Space. In this case, Manip Lattice
     // Action Space may use this to determine when to use adaptive motion
     // primitives.
-    space.insertHeuristic(&h);
-
-
-    // 9. Instantiate and Initialize Search (associated with Planning Space)
-    const bool forward = true;
-    auto search = std::make_shared<sbpl::TRAPlanner>(pspace.get(), h.get(), forward);
+    spact
+.insertHeuristic(&h);
 
     // 11. Create Search, associated with the planning space and heuristic
     sbpl::ARAStar search(&space, &h);
@@ -566,15 +440,6 @@ int main(int argc, char* argv[])
 
     // 13. Set start state and goal condition in the Planning Space and
     // propagate state IDs to search
-
-    double start_x = 0.2;
-    double start_y = 0.2;
-    const smpl::RobotState start_state = { start_x, start_y };
-
-    double goal_x = 0.6;
-    double goal_y = 0.6;
-    const smpl::RobotState goal_state = { goal_x, goal_y };
-
     double start_x = 0.5 * world_size_x;
     double start_y = 0.33 * world_size_y;
     const smpl::RobotState start_state = space.getDiscreteCenter({ start_x, start_y });
@@ -598,9 +463,6 @@ int main(int argc, char* argv[])
         return 1;
     }
 
-
-    int start_id = pspace->getStartStateID();
-
     int start_id = space.getStartStateID();
     if (start_id < 0) {
         SMPL_ERROR("Start state id is invalid");
@@ -612,9 +474,6 @@ int main(int argc, char* argv[])
         SMPL_ERROR("Goal state id is invalid");
         return 1;
     }
-   
-    if (search->set_start(start_id) == 0) {
-        ROS_ERROR("Failed to set planner start state");
 
     if (search.set_start(start_id) == 0) {
         SMPL_ERROR("Failed to set planner start state");
@@ -626,13 +485,8 @@ int main(int argc, char* argv[])
         return 1;
     }
 
-
-    SetupOccupancyGrid(*grid,3,5,8);
-    PrintGrid(std::cout, *grid);
-
-     // 11. Plan a path
-
     // 14. Plan a path
+
     ReplanParams search_params(10.0);
     search_params.initial_eps = epsilon;
     search_params.final_eps = 1.0;
@@ -648,66 +502,12 @@ int main(int argc, char* argv[])
         SMPL_ERROR("Search failed to find a solution");
         return 1;
     }
-
     auto now = std::chrono::high_resolution_clock::now();
     const double elapsed = std::chrono::duration<double>(now - then).count();
 
     // 15. Extract path from Planning Space
 
     std::vector<smpl::RobotState> path;
-
-    std::vector<geometry_msgs::PoseStamped> eePath;
-    if (!pspace->extractPath(solution, path, eePath)) {
-        ROS_ERROR("Failed to extract path");
-    }
-
-    ROS_INFO("Path found!");
-    ROS_INFO("  Planning Time: %0.3f", elapsed);
-    ROS_INFO("  Expansion Count (total): %d", search->get_n_expands());
-    ROS_INFO("  Expansion Count (initial): %d", search->get_n_expands_init_solution());
-    ROS_INFO("  Solution (%zu)", solution.size());
-    for (int id : solution) {
-        ROS_INFO("    %d", id);
-    }
-    ROS_INFO("  Path (%zu)", path.size());
-    for (const smpl::RobotState& point : path) {
-        ROS_INFO("    (x: %0.3f, y: %0.3f)", point[0], point[1]);
-    }
-    PrintPath(std::cout,*grid,path);
-
-    /*grid = new sbpl::OccupancyGrid(
-            world_size_x, world_size_y, world_size_z,
-            grid_res,
-            world_origin_x, world_origin_y, world_origin_z,
-            max_distance_m,
-            ref_count);
-
-
-    SetupOccupancyGrid(*grid,23,27,48);
-
-     cc.changeOccupancyGrid(grid);
-
-    solution.clear();
-    solcost = 0;
-    path.clear();
-    eePath.clear();
-    search->costs_changed();
-    //search->force_planning_from_scratch();
-    bret = search->replan(&solution, search_params, &solcost);
-    if (!bret) {
-        ROS_ERROR("Search failed to find a solution");
-        return 1;
-    }
-    
-    now = std::chrono::high_resolution_clock::now();
-    const double elapsed2 = std::chrono::duration<double>(now - then).count();
-
-    // 12. Extract path from Planning Space
-
-     if (!pspace->extractPath(solution, path, eePath)) {
-        ROS_ERROR("Failed to extract path");
-    }
-
     if (!space.extractPath(solution, path)) {
         SMPL_ERROR("Failed to extract path");
     }
@@ -728,20 +528,5 @@ int main(int argc, char* argv[])
 //        SMPL_INFO("    (x: %0.3f, y: %0.3f)", point[0], point[1]);
 //    }
 
-    ROS_INFO("Path found!");
-    ROS_INFO("  Planning Time: %0.3f", elapsed2);
-    ROS_INFO("  Expansion Count (total): %d", search->get_n_expands());
-    ROS_INFO("  Expansion Count (initial): %d", search->get_n_expands_init_solution());
-    ROS_INFO("  Solution (%zu)", solution.size());
-    for (int id : solution) {
-        ROS_INFO("    %d", id);
-    }
-    ROS_INFO("  Path (%zu)", path.size());
-    for (const smpl::RobotState& point : path) {
-        ROS_INFO("    (x: %0.3f, y: %0.3f)", point[0], point[1]);
-    }
-    PrintPath(std::cout,*grid,path);*/
     return 0;
 }
-
-
